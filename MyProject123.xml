@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<!DOCTYPE boost_serialization>
+<boost_serialization signature="serialization::archive" version="17">
+<Project class_id="0" tracking_level="0" version="0">
+	<name_>first_test</name_>
+	<workingPath_>˜/Ajile/Projects/New Project</workingPath_>
+	<components_ class_id="1" tracking_level="0" version="0">
+		<count>0</count>
+		<item_version>0</item_version>
+	</components_>
+	<sequences_ class_id="2" tracking_level="0" version="0">
+		<count>0</count>
+		<item_version>0</item_version>
+	</sequences_>
+	<images_ class_id="3" tracking_level="0" version="0">
+		<count>0</count>
+		<item_version>0</item_version>
+	</images_>
+	<previewImages_>
+		<count>0</count>
+		<item_version>0</item_version>
+	</previewImages_>
+	<triggerRules_ class_id="4" tracking_level="0" version="0">
+		<count>0</count>
+		<item_version>0</item_version>
+	</triggerRules_>
+</Project>
+</boost_serialization>
+
