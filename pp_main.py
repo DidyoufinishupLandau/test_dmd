@@ -5,6 +5,9 @@ import time
 import pattern_generator
 import generate_pattern # more efficient
 # Connect to the DMD
+"""
+This file is used for calibration
+"""
 pattern = generate_pattern.DmdPattern("hadamard", 32, 32)
 pattern= pattern.execute()
 dmd = DMD_driver()

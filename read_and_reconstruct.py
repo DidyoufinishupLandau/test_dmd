@@ -25,13 +25,11 @@ def get_data():
         data_two = np.hstack((data_two, temp_data_two))
     print(len(data_one))
     return data_one, data_two
-def combine_data(pattern, intensity):
+def combine_data(positive_pattern, negative_pattern, intensity):
     image = []
-    for i in range(1, len(pattern)):
-        temp_pattern = pattern[i]
-        reverse_pattern = (temp_pattern==0).astype(int)*-1
-        image.append(intensity[i]*(temp_pattern+reverse_pattern))
-    image = np.sum(np.array(image), axis=0)/len(pattern)
+    for i in range(1, len(positive_pattern)):
+        image.append(intensity[i]*(positive_pattern[i]-negative_pattern[i]))
+    image = np.sum(np.array(image), axis=0)/len(positive_pattern)
     return  image
 def plot_pixel(image_matrix):
     plt.imshow(image_matrix, cmap="gray")
@@ -73,16 +71,3 @@ def replace_smallest(arr, replacement=0):
     largest_value = np.min(arr)
     arr[arr == largest_value] = replacement
     return arr
-data_one, data_two = get_data()
-print(data_one)
-print(data_two)
-gp = generate_pattern.DmdPattern('hadamard', 64,64)
-pattern = gp.execute(two_dimension=True)
-
-
-image = combine_data(pattern, (data_one-data_two)/(data_one+data_two))
-image = smooth_image(image)
-image = smooth_image(image)
-image = smooth_image(image)
-image = smooth_image(image)
-plot_pixel(image)

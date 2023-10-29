@@ -91,20 +91,17 @@ def plot_pixel(image_matrix):
 
 
 class SimulationCompressingImage:
-    def __init__(self, width, height, light_intensity=1):
+    def __init__(self, width, height, input_image, light_intensity=1):
         self.light_intensity = light_intensity
         self.width = width
         self.height = height
         self.num_pixel = width * height
-        self.simulation_image = random_image_with_shapes(width, height)
+        self.simulation_image = input_image
     def execute(self, pattern, reverse_pattern, sampling_rate=1, noise_rate=0):
         image = []
-        plot_pixel(self.simulation_image)
         for i in range(int(len(pattern) * sampling_rate)):
             mask = pattern[i]
             reverse_mask = reverse_pattern[i]
-            print(mask)
-            print(reverse_mask)
             fractional_signal = np.sum((mask * self.simulation_image)/255) / self.num_pixel
             reverse_fractional_signal = np.sum((reverse_mask * self.simulation_image)/255) / self.num_pixel
 
