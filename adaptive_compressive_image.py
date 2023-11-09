@@ -4,6 +4,7 @@ from test_wavelet import *
 from read_and_reconstruct import combine_data
 from DMD_main import control_DMD
 from skimage import transform
+import numpy as np
 
 class AdaptiveCompressiveImage:
     def __init__(self, num_stage, image_resolution, threshold):

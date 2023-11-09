@@ -4,7 +4,9 @@ import numpy as np
 import generate_pattern
 import matplotlib.pyplot as plt
 from skimage import transform
-count = 4
+count = 1
+pixel = 128
+group = 30
 def get_calibration():
     data_one = np.array([])
     data_two = np.array([])
@@ -19,8 +21,10 @@ def get_data():
     data_one = np.array([])
     data_two = np.array([])
     for i in range(count):
-        temp_data_one = np.genfromtxt(f"one_data_{i+1}.csv",delimiter=',')
-        temp_data_two = np.genfromtxt(f'two_data_{i+1}.csv',delimiter=',')
+        temp_data_one = np.genfromtxt(f"{pixel}_{group}_one_data_{i+1}.csv",delimiter=',')
+        temp_data_one = temp_data_one[0:4096]
+        temp_data_two = np.genfromtxt(f'{pixel}_{group}_two_data_{i+1}.csv',delimiter=',')
+        temp_data_two = temp_data_two[0:4096]
         data_one = np.hstack((data_one, temp_data_one))
         data_two = np.hstack((data_two, temp_data_two))
     print(len(data_one))
@@ -71,3 +75,10 @@ def replace_smallest(arr, replacement=0):
     largest_value = np.min(arr)
     arr[arr == largest_value] = replacement
     return arr
+def remove_row(arr, row_to_remove):
+    return np.delete(arr, row_to_remove, axis=0)
+positive_pattern, negative_pattern = generate_pattern.DmdPattern('hadamard', 64,64).execute()
+data_one, data_two = get_data()
+image = combine_data(positive_pattern, negative_pattern, (data_one-data_two)/(data_one+data_two))
+image = smooth_image(image)
+plot_pixel(image)

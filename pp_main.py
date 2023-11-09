@@ -16,9 +16,10 @@ dmd.create_project(project_name='test_project')
 dmd.create_main_sequence(seq_rep_count=1)
 # Image
 count = 0
-for i in range(0, 1024):
+for i in range(0, 500):
     count+=1
-    dmd.add_sequence_item(image=pattern_generator.one_side(), seq_id=1, frame_time=100)
+    dmd.add_sequence_item(image=pattern_generator.one_side(), seq_id=1, frame_time=1000)
+
 print(count)
 
 
@@ -29,7 +30,7 @@ while loop:
     dmd.my_trigger()
     dmd.start_projecting()
     # Stop the sequence
-    time.sleep(1000)
+    time.sleep(5)
     INPUT = input()
     if INPUT == "N":
         loop = False
