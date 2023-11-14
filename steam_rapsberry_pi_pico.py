@@ -36,13 +36,6 @@ def handle_interrupt(interrupt_pin: Pin) -> None:
     _DATA_two.append(read_PD_two())
 
 
-def stop_interrupt(interrupt_pin: Pin):
-    global _ACQ_COUNTER
-    global _DATA
-
-    print(_ACQ_COUNTER)
-
-
 def read_PD() -> float:
     """Read from the photodiode pin, return as u16"""
 
