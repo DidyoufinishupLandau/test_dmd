@@ -3,59 +3,45 @@ import numpy as np
 import sys
 
 class StreamRaspberry:
-    def __init__(self, PORT: str = 'COM3', BAUD_RATE: int = 9600, timeout: int = 3):
+    def __init__(self, PORT: str = 'COM3', BAUD_RATE: int = 128000, timeout: int = 3):
         self.ser = serial.Serial(PORT, BAUD_RATE, timeout=timeout)
         if self.ser.isOpen():
             print('Serial port opened:', self.ser.portstr)
-
-    def get_data(self, num_frames, save_data=True, file_name='output'):
+    def start_acquisation(self):
+        self.ser.write(b"S_TRUE\r\n")
+    def get_data_one(self):
+        self.ser.write(b"one_length")
+        one_length = self.ser.readline()
+        one_length = int(one_length[0:len(one_length)-2].decode("utf-8"))
         data_one = []
+        for _ in range(one_length):
+            line = self.ser.readline()
+            line = int(line[0:len(line)-2].decode("utf-8"))
+            data_one.append(line)
+        return data_one
+    def get_data_two(self):
+        self.ser.write(b"two_length")
+        two_length = self.ser.readline()
+        two_length = int(two_length[0:len(two_length)-2].decode("utf-8"))
         data_two = []
+        for _ in range(two_length):
+            line = self.ser.readline()
+            line = int(line[0:len(line)-2].decode("utf-8"))
+            data_two.append(line)
+        return data_two
 
-        try:
-            print("Ready for commands (type 'start' to begin, 'break' to exit):")
-            while True:
-                command = sys.stdin.readline().strip()  # Use .strip() to remove whitespace
-                if command == 'break':
-                    break
-                elif command == 'start':
-                    print('Starting data acquisition...')
-                    self.ser.write(b"START\n")
-                    while len(data_one) < num_frames:
-                        # Read a line of data from the Pico
-                        line = self.ser.readline().decode('utf-8').strip()
-                        print("Received:", line)  # Debug print
-
-                        # Check if the line contains the expected data
-                        if "ONE:" in line and "TWO:" in line:
-                            try:
-                                adc_data_one = int(line.split(",")[0].split(":")[1])
-                                adc_data_two = int(line.split(",")[1].split(":")[1])
-
-                                data_one.append(adc_data_one)
-                                data_two.append(adc_data_two)
-                            except ValueError:
-                                print("Malformed data line received:", line)
-
-                    self.ser.write(b"STOP\n")
-                    print('Data acquisition stopped.')
-
-                    if save_data:
-                        data_one = np.array(data_one).reshape(len(data_one), 1)
-                        data_two = np.array(data_two).reshape(len(data_two), 1)
-                        data = np.hstack((data_one, data_two))
-                        file_name += ".csv"
-                        np.savetxt(file_name, data, delimiter=',')
-                        return data
-
-        except serial.SerialException as e:
-            print("Serial error:", e)
-        except serial.SerialTimeoutException as e:
-            print("Serial timeout:", e)
-
-        return data_one, data_two
-
-# Usage
-SR = StreamRaspberry()
-data_one, data_two = SR.get_data(3)
-print(data_one)
+def save_data(data_one, data_two, image_size, group, _Data_counter):
+    name_one = f"{image_size}_{group}_one_data_{_Data_counter}.csv"
+    name_two = f"{image_size}_{group}_two_data_{_Data_counter}.csv"
+    str_data = str(data_one)
+    str_data = str_data[1:]
+    str_data = str_data[:len(str_data) - 1]
+    str_data_two = str(data_two)
+    str_data_two = str_data_two[1:]
+    str_data_two = str_data_two[:len(str_data_two) - 1]
+    with open(name_one, 'w') as file_one:
+        file_one.write(str_data)
+    file_one.close()
+    with open(name_two, 'w') as file_two:
+        file_two.write(str_data_two)
+    file_two.close()
