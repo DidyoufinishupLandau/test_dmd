@@ -15,6 +15,7 @@ PD_pin_two: ADC = ADC(1)
 
 # Global variables
 _NO_OF_IMAGES: int = 4096
+image_size = 128
 _DELAY: int = 0
 _START: bool = False
 _READY_FOR_ACQ: bool = False
@@ -22,7 +23,9 @@ _DATA: list = []
 _DATA_two: list = []
 _ACQ_COUNTER: int = 0
 _Data_counter = 0
-num_repeat = 1
+NUM_GROUP = 1
+group = 43
+
 
 def handle_interrupt(interrupt_pin: Pin) -> None:
     """Define interrupt  handler - must be fast and inner loop"""
@@ -33,8 +36,11 @@ def handle_interrupt(interrupt_pin: Pin) -> None:
     #print(sys.stdin.buffer.read(read_PD()))
     _DATA.append(read_PD())
     _DATA_two.append(read_PD_two())
-
-
+def stop_interrupt(interrupt_pin: Pin):
+    global _ACQ_COUNTER
+    global _DATA
+    
+    print(_ACQ_COUNTER)
 def read_PD() -> float:
     """Read from the photodiode pin, return as u16"""
 
@@ -43,18 +49,13 @@ def read_PD_two():
     return PD_pin_two.read_u16()
 
 
-def send_trigger(sleep_time_us: int = 1):
+def send_trigger(sleep_time_us: int = 10):
     """Send the output trigger high and low"""
     TO_DMD_IN_pin.value(1)
     # Define sleep-time
     if sleep_time_us > 0:
         utime.sleep_us(sleep_time_us)
     TO_DMD_IN_pin.value(0)
-
-
-def disable_input_trigger():
-    FROM_DMD_OUT_pin.remove_program()  # I cannot find a method that would disable the trigge, irq_clear() doesn't work
-
 
 def acquire(no_of_images: int, delay: int = 0) -> list:
     """Primary acquire loop"""
@@ -63,7 +64,6 @@ def acquire(no_of_images: int, delay: int = 0) -> list:
     global _ACQ_COUNTER
     global _DATA_two
     global _Data_counter
-
     # Attach handle_interrupt to the falling edge of Pin
     FROM_DMD_OUT_pin.irq(trigger=Pin.IRQ_FALLING, handler=handle_interrupt)
 
@@ -72,19 +72,21 @@ def acquire(no_of_images: int, delay: int = 0) -> list:
     if delay > 0:
         while _ACQ_COUNTER < no_of_images + 1:
             send_trigger()
-            
             utime.sleep_us(delay)
 
     else:
         print("no delay acquire")
+            #handle_interrupt(0)
         while _ACQ_COUNTER < no_of_images:
             send_trigger()
-            #handle_interrupt(0)
+        FROM_DMD_OUT_pin.irq(trigger=Pin.IRQ_FALLING, handler=stop_interrupt)
         if _ACQ_COUNTER == no_of_images:
             print("saving_image")
+            print(len(_DATA))
+            print(len(_DATA_two))
             _Data_counter+=1
-            name_one = f"one_data_{_Data_counter}.csv"
-            name_two = f"two_data_{_Data_counter}.csv"
+            name_one = f"{image_size}_{group}_one_data_{_Data_counter}.csv"
+            name_two = f"{image_size}_{group}_two_data_{_Data_counter}.csv"
             str_data = str(_DATA)
             str_data = str_data[1:]
             str_data = str_data[:len(str_data)-1]
@@ -109,7 +111,7 @@ def acquire(no_of_images: int, delay: int = 0) -> list:
 
 
 def Read() -> str:
-    return sys.stdin.readline()
+    return sys.stdin.readline().encode('UTF-8')
 
 
 def Write(data: list):
@@ -127,7 +129,7 @@ def restart():
     global _DATA_two
     global _ACQ_COUNTER
     global _Data_counter
-    _NO_OF_IMAGES = 4000
+    _NO_OF_IMAGES = 4096
     _DELAY = 0
     _START = False
     _DATA = []
@@ -194,7 +196,7 @@ def main():
             # Parse
             commands_parser(text)
         if _START:
-            for _ in range(num_repeat):
+            for i in range(NUM_GROUP):
                 acquire(_NO_OF_IMAGES, _DELAY)
             _START = False
 main()
