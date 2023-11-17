@@ -2,6 +2,7 @@ import time
 from machine import Pin, ADC
 import utime
 import sys
+import gc
 
 # Initialize connections
 # Trigger 0 is connected to DMD output. Set as in, pull down
@@ -15,7 +16,6 @@ led = Pin(25, Pin.OUT, Pin.PULL_DOWN)
 led.toggle()
 # Global variables
 _START: bool = False
-_BREAK: bool = False
 _DATA: list = []
 _DATA_two: list = []
 i = 0
@@ -32,9 +32,14 @@ def test_interrupt(pin):
     global i
     global _DATA
     global _DATA_two
-    _DATA.append(i)
-    _DATA_two.append(i)
-    i+=1
+    try:
+        _DATA.append(i)
+        _DATA_two.append(i)
+        i+=1
+    except MemoryError:
+        disable_acquire()
+        print("Memory error, garbag being cleaned")
+        machine.reset()
 
 def test_acquire():
     led.irq(trigger=Pin.IRQ_RISING, handler=test_interrupt)
@@ -47,12 +52,13 @@ def read_PD() -> float:
 
     return PD_pin.read_u16()
 def simu_signal():
-    for i in range(4096):
+    for i in range(10096):
         led.value(1)
         led.toggle()
         utime.sleep_us(10)
         led.value(0)
         led.toggle()
+    print("complete ")
 def read_PD_two():
     return PD_pin_two.read_u16()
 
@@ -84,7 +90,6 @@ def commands_parser(comm: str) -> None:
     global _DATA
     global _DATA_two
     global i
-    global _BREAK
 
     led = Pin(25, Pin.OUT)
     if "S_" in comm:
@@ -113,13 +118,11 @@ def commands_parser(comm: str) -> None:
     if "STOP" in comm:
         test_disable()
     if "BREAK" in comm:
-        _BREAK = True
+        machine.reset()
 def main():
     """Main loop"""
     global _START
-    global _BREAK
     _START = False
-    _BREAK = False
     # Continuously read
     while True:
         text = Read()
@@ -129,7 +132,5 @@ def main():
         if _START:
             test_acquire()
             _START = False
-        if _BREAK:
-            machine.reset()
 if __name__ == "__main__":
     main()
