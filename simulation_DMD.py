@@ -7,8 +7,9 @@ This is a temporary script file.
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
+from generate_pattern import DmdPattern
 from PIL import Image, ImageDraw
-
+import cv2
 def random_image_with_shapes(width, height, num_shapes=5):
     # Create a random background
     background = np.random.randint(0, 256, (width, height, 3), dtype=np.uint8)
@@ -91,19 +92,18 @@ def plot_pixel(image_matrix):
 
 
 class SimulationCompressingImage:
-    def __init__(self, width, height, input_image, light_intensity=1):
+    def __init__(self, input_image, light_intensity=1):
         self.light_intensity = light_intensity
-        self.width = width
-        self.height = height
-        self.num_pixel = width * height
         self.simulation_image = input_image
-    def execute(self, pattern, reverse_pattern, sampling_rate=1, noise_rate=0):
+    def execute(self,pattern, reverse_pattern, sampling_rate=1, noise_rate=0):
         image = []
+        image_width, image_height = self.simulation_image.shape
+        num_pixel = len(pattern)
         for i in range(int(len(pattern) * sampling_rate)):
-            mask = pattern[i]
-            reverse_mask = reverse_pattern[i]
-            fractional_signal = np.sum((mask * self.simulation_image)/255) / self.num_pixel
-            reverse_fractional_signal = np.sum((reverse_mask * self.simulation_image)/255) / self.num_pixel
+            mask = resize(pattern[i],image_width , image_height)
+            reverse_mask = resize(reverse_pattern[i], image_width , image_height)
+            fractional_signal = np.sum((mask * self.simulation_image)/255) / num_pixel
+            reverse_fractional_signal = np.sum((reverse_mask * self.simulation_image)/255) / num_pixel
 
             photo_diode_signal = self.light_intensity * fractional_signal
             photo_diode_reverse_signal = self.light_intensity * reverse_fractional_signal
@@ -148,3 +148,5 @@ class PSNR:
             return float('inf')
 
         return 10 * np.log10(np.max(self.ground_image) ** 2 / mean_square_error)
+def resize(input_image, width, height):
+    return cv2.resize(input_image, (width, height), interpolation=cv2.INTER_LINEAR)
