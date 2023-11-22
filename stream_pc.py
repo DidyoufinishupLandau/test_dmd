@@ -3,16 +3,25 @@ import numpy as np
 import sys
 
 class StreamRaspberry:
-    def __init__(self, PORT: str = 'COM7', BAUD_RATE: int = 128000, timeout: int = 3):
+    def __init__(self, PORT: str = 'COM7', BAUD_RATE: int = 115200, timeout: int = 3):
         self.ser = serial.Serial(PORT, BAUD_RATE, timeout=timeout)
         if self.ser.isOpen():
             print('Serial port opened:', self.ser.portstr)
     def start_acquisation(self):
+        self.ser.write(b"STOP\r\n")
+        self.ser.flush()
+        line = self.ser.readline().strip()
+        print("reset", line)
+        self.ser.write(b"RS\r\n")
+        self.ser.flush()
         self.ser.write(b"S_TRUE\r\n")
+        self.ser.flush()
     def get_data(self, length):
         data_one = []
         data_two = []
+
         self.ser.write(b"ShowData\r\n")
+        self.ser.flush()
         print("getting data")
         for _ in range(length):
             line = self.ser.readline().strip()
@@ -21,14 +30,14 @@ class StreamRaspberry:
             data_two.append(int(line))
         print("finish")
         self.ser.write(b"STOP\r\n")
+        self.ser.flush()
+        line = self.ser.readline().strip()
+        print(line)
         self.ser.write(b"RS\r\n")
+        self.ser.flush()
+        self.ser.close()
+
         return data_one, data_two
-    def stop(self):
-        self.ser.write(b"STOP\r\n")
-        line = self.ser.readline()
-        print(str(line[0:len(line) - 2].decode("utf-8")))
-        line = self.ser.readline()
-        print(str(line[0:len(line) - 2].decode("utf-8")))
 
 def save_data(data_one, data_two, image_size, group, _Data_counter):
     name_one = f"{image_size}_{group}_one_data_{_Data_counter}.csv"
@@ -46,17 +55,3 @@ def save_data(data_one, data_two, image_size, group, _Data_counter):
     with open(name_two, 'w') as file_two:
         file_two.write(str_data_two)
     file_two.close()
-import time
-ser = serial.Serial("COM7", 128000, timeout=3)
-for i in range(1000):
-    ser.write(b"S_TRUE\r\n")
-    ser.write(b"SM\r\n")
-    ser.write(b"ShowData\r\n")
-    for i in range(4096):
-        print(int(ser.readline().strip()))
-        print(int(ser.readline().strip()))
-
-    ser.write(b"STOP\r\n")
-    ser.write(b"RS\r\n")
-    time.sleep(3)
-ser.write(b"BREAK\r\n")
