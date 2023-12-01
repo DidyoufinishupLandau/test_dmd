@@ -42,12 +42,6 @@ def split_matrix(arr):
                                                 arr[int(width/2):width,int(width/2):width])
     return  top_left, top_right, bot_left, bot_right
 
-def test_dimulation_DMD():
-    random_image = random_image_with_shapes(128, 128, 10)
-    pattern, inverse = DmdPattern("hadamard", 64,64).execute()
-    image = SimulationCompressingImage(random_image).execute(pattern, inverse)
-    plot_pixel(random_image)
-    plot_pixel(image)
 
 
 def adaptive_pattern(image, size, num_stage):
@@ -169,12 +163,6 @@ def reconstruct_image_from_wavelet(wt_dic):
             print("calculating_edge:", np.sum(summed_edge))
             reconstructed_image = inverse_wavelet_trasform(image, hor, ver, dia)
             temp_reconstruction.append(reconstructed_image)
-        """        if i==2:
-                    del temp_reconstruction[14]
-                    del temp_reconstruction[3]
-                    del temp_reconstruction[2]
-                if i==1:
-                    del temp_reconstruction[2]"""
         reconstruction.append(np.sum(np.array(temp_reconstruction),axis = 0))
     return reconstruction
 random_image = random_image_with_shapes(128,128)
@@ -184,6 +172,4 @@ image, hor, ver, dia  = wt_list["2"][2]
 
 reconstruction = reconstruct_image_from_wavelet(wt_list)
 plot_pixel(reconstruction[0])
-plot_pixel(reconstruction[1])
-plot_pixel(reconstruction[2])
-plot_pixel(reconstruction[0]+reconstruction[1]+reconstruction[2])
+plot_pixel(np.sum(np.array(reconstruction), axis=0))

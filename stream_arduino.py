@@ -2,20 +2,21 @@ import serial
 import time
 import numpy as np
 class StreamArduino:
-    def __init__(self, port='COM11', baudrate=115200,timeout=3):
+    def __init__(self, port='COM11', baudrate=115200,timeout=100):
         self.arduino = serial.Serial(port=port, baudrate=baudrate, timeout=timeout)
     def start(self):
         self.arduino.write(bytes("START", 'utf-8'))
-        print(self.arduino.readline().strip())
+        print("pycharm call start")
 
-    def get_data(self, data_length=4096):
+    def get_data(self, data_length=4096, iter=1):
         data_one = []
         data_two = []
-        for i in range(data_length):
+        print("collecting data")
+        for i in range(data_length*iter):
             data_one.append(self.arduino.readline().strip())
             data_two.append(self.arduino.readline().strip())
+        print("endloop")
         self.arduino.write(bytes("STOP", 'utf-8'))
-        print(self.arduino.readline().strip())
         data_one = str(np.array(data_one).astype(int).tolist())
         data_two = str(np.array(data_two).astype(int).tolist())
         data_one = data_one[1:len(data_one)-1]

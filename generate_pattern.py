@@ -31,6 +31,7 @@ class DmdPattern():
         nd.array: A single random pattern with given sparsity that point left.
         nd.array: A single random pattern with given sparsity that point right.
         """
+        print("spcae")
         if self.pattern == "hadamard":
             positive_image = hadmard_matrix(self.hadmard_size)
             if self.hadmard_size <128:
@@ -47,12 +48,52 @@ class DmdPattern():
 
 
         elif self.pattern == "random":
-            positive_image = random_pattern(self.width, self.height, random_sparsity) * self.gray_scale
-            return  positive_image
+            positive_image_list = []
+            negative_image_list = []
+            for i in range(self.width*self.height*length):
+                positive = random_pattern(self.width, self.height, random_sparsity)
+                negative = (positive==0).astype(int)
+                positive_image_list.append(positive)
+                negative_image_list.append(negative)
+            return  positive_image_list, negative_image_list
+
+        elif self.pattern == "raster":
+            positive_image_list = []
+            negative_image_list = []
+            for i in range(self.width):
+                for j in range(self.height):
+                    positive = np.zeros((self.width, self.height))
+                    positive[i][j] = 1
+                    negative = (positive==0).astype(int)
+                    positive_image_list.append(positive.astype(np.uint8))
+                    negative_image_list.append(negative.astype(np.uint8))
+            return  positive_image_list, negative_image_list
+        elif self.pattern == "fourier":
+            fourier_mask = []
+            phase = [0,np.pi/2, np.pi, np.pi*3/2]
+            for i in range(self.width):
+                for j in range(self.height):
+                    for k in range(len(phase)):
+                        fourier_mask.append(generate_fourier_mask(i,j,self.width,phase[k]))
+            return fourier_mask
 def three_dimension(pattern):
     def inner_loop(two_dimension_pattern):
         return two_dimension_pattern.T[:,:,np.newaxis]
     return list(map(inner_loop, pattern))
+def generate_fourier_mask(u,v,N, phi):
+    """
+    Generate a Fourier mask for a square image of size N pixels.
+
+    Args:
+    N (int): The number of pixels along one dimension of the square image.
+    phi (float): The phase term, which should vary between 0 and 2π.
+
+    Returns:
+    numpy.ndarray: The generated Fourier mask.
+    """
+    x, y= np.meshgrid(np.arange(N), np.arange(N))
+    mask = np.cos(2 * np.pi * (u * x + v * y) / N + phi)
+    return mask
 def embed(pattern):
     height,width = pattern[0].shape
     DMD_height = 1140

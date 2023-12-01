@@ -9,17 +9,16 @@ import serial
 """
 This file is used for calibration
 """
-pattern = generate_pattern.DmdPattern("hadamard", 32, 32)
-pattern= pattern.execute()
+
 dmd = DMD_driver()
 # Create a default project
 dmd.create_project(project_name='test_project')
 dmd.create_main_sequence(seq_rep_count=1)
 # Image
 count = 0
-for i in range(0, 500):
+for i in range(0, 4096):
     count+=1
-    dmd.add_sequence_item(image=pattern_generator.one_side(), seq_id=1, frame_time=1000)
+    dmd.add_sequence_item(image=pattern_generator.one_side(), seq_id=1, frame_time=3)
 
 print(count)
 

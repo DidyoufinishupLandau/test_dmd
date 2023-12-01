@@ -3,7 +3,7 @@ import numpy as np
 import sys
 
 class StreamRaspberry:
-    def __init__(self, PORT: str = 'COM7', BAUD_RATE: int = 115200, timeout: int = 3):
+    def __init__(self, PORT: str = 'COM8', BAUD_RATE: int = 115200, timeout: int = 3):
         self.ser = serial.Serial(PORT, BAUD_RATE, timeout=timeout)
         if self.ser.isOpen():
             print('Serial port opened:', self.ser.portstr)

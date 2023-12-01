@@ -117,6 +117,28 @@ class SimulationCompressingImage:
         image = np.sum(np.array(image), axis=0) / (int(len(pattern) * sampling_rate))
         image = image + abs(np.min(image))
         return image
+    def fourier(self,pattern, reverse_pattern, sampling_rate=1, noise_rate=0):
+        image = []
+        image_width, image_height = self.simulation_image.shape
+        num_pixel = len(pattern)
+        for i in range(int(len(pattern) * sampling_rate)):
+            mask = resize(pattern[i],image_width , image_height)
+            reverse_mask = resize(reverse_pattern[i], image_width , image_height)
+            fractional_signal = np.sum((mask * self.simulation_image)/255) / num_pixel
+            reverse_fractional_signal = np.sum((reverse_mask * self.simulation_image)/255) / num_pixel
+
+            photo_diode_signal = self.light_intensity * fractional_signal
+            photo_diode_reverse_signal = self.light_intensity * reverse_fractional_signal
+
+            # signal_noise = np.random.randint(-100,100,[self.width, self.height])/100*noise_rate*self.light_intensity
+            signal_noise = np.random.randint(0, 100) / 100 * noise_rate * self.light_intensity
+            reverse_signal_nose = np.random.randint(0, 100) / 100 * noise_rate * self.light_intensity
+            signal = photo_diode_signal + signal_noise
+            reverse_signal = photo_diode_reverse_signal + reverse_signal_nose
+            image.append((signal-reverse_signal)*(mask-reverse_mask))
+        image = np.sum(np.array(image), axis=0) / (int(len(pattern) * sampling_rate))
+        image = image + abs(np.min(image))
+        return image
 
 class PSNR:
     def __init__(self, ground_image, reconstruction_image):

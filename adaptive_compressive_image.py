@@ -1,11 +1,7 @@
-import generate_pattern
-from stream_raspberry import StreamRaspberry
-from test_wavelet import *
-from read_and_reconstruct import combine_data
-from DMD_main import control_DMD
-from skimage import transform
+from generate_pattern import DmdPattern
 import numpy as np
-
+from simulation_DMD import SimulationCompressingImage
+import pywt
 class AdaptiveCompressiveImage:
     def __init__(self, num_stage, image_resolution, threshold):
         """
@@ -18,132 +14,76 @@ class AdaptiveCompressiveImage:
         self.image_resolution = image_resolution
         self.Hadamard_size = int(image_resolution/2**(num_stage-1))
         self.threshold = threshold
-    def adaptive_pattern(self):
-        gp = generate_pattern.DmdPattern('hadamard', self.Hadamard_size, self.Hadamard_size)
-        two_dimension_hadamard, negative_pattern = gp.execute(two_dimension=True)
+
+    def adaptive_pattern(self, image):
+        image_size = image.shape
+        gp = DmdPattern('hadamard', self.Hadamard_size, self.Hadamard_size)
+        two_dimension_hadamard, negative_pattern = gp.execute()
         new_pattern_list = []
         new_pattern_list.append(two_dimension_hadamard)
         negative_pattern_list = []
         negative_pattern_list.append(negative_pattern)
         # generate all pattern that would require in later procedure
         # noting that the order is always from top left to bottom right
-        for i in range(1, self.num_stage):
-            for j in range(4):
+        for i in range(1, self.num_stage + 1):
+            for j in range(1, 5):
                 for k in range(4 ** (i - 1)):
-                    print(int(k+4**(i-2)))
-                    negative_pattern_list.append(embed_in_corner(negative_pattern_list[int(k+4**(i-2))], self.Hadamard_size*(i+1), j))
-                    new_pattern_list.append(embed_in_corner(new_pattern_list[int(k+4**(i-2))], self.Hadamard_size*(i+1), j))
-        return new_pattern_list, negative_pattern_list
+                    print(int(k + 4 ** (i - 2)), "size", (self.Hadamard_size * 2 ** (i), self.Hadamard_size * 2 ** (i)), j)
+                    negative_pattern_list.append(
+                        embed_in_corner(negative_pattern_list[int(k + 4 ** (i - 2))],
+                                        (self.Hadamard_size * 2 ** (i), self.Hadamard_size * 2 ** (i)), j))
+                    new_pattern_list.append(
+                        embed_in_corner(new_pattern_list[int(k + 4 ** (i - 2))], (self.Hadamard_size * 2 ** (i), self.Hadamard_size * 2 ** (i)), j))
+        wt_dic = {}
+        i = 0
+        j = 0
+        temp_wt_list = []
+        projection_list = [1]
+        while len(new_pattern_list) > 0:
+            print(len(new_pattern_list))
+            temp_pattern = new_pattern_list[0]
+            temp_inverse = negative_pattern_list[0]
+            del new_pattern_list[0]
+            del negative_pattern_list[0]
+            if projection_list[i] == 1:
+                #replace the following line to DMD main
+                image_ = SimulationCompressingImage(image).execute(temp_pattern, temp_inverse)
+                wt_level_ = wavelet_transform_level_one(image_)
+                temp_wt_list.append(wt_level_)
 
-    def execute(self):
-        # The relevance of quadrant. 1 imply there will be further sampling in this quadrant
-        record_quadrant = [1]
-        # The wavelet information will save in this list
-        wavelet_info = []
-        # The positive and negative array[2d array]
-        pattern_list, negative_pattern_list = self.adaptive_pattern()
-        # The number of frames equal to the number of patterns
-        num_frames =pattern_list[0].shape[0]
-        for i in range(self.num_stage):
-            #Now we define a inner function to rescale the image size
-            #The first stage image size is equavalent to image resolution
-            # However, the pattern resolution is smaller than image resolution.
-            # The second stage image size equal to image resolution / 2
-            # The pattern resolution * 2 by taking using same size pattern but focus on smaller region.
-            def rescale(input_image: np.array) -> np.array:
-                rs = transform.resize(input_image,
-                                      (int(self.image_resolution / (2 ** i)), int(self.image_resolution / 2 ** i)),
-                                      order=0, anti_aliasing=False)
-                return rs
+            elif projection_list[i] == 0:
+                image_ = np.zeros((image_size))
+                wt_level_ = wavelet_transform_level_one(image_)
+                temp_wt_list.append(wt_level_)
+            i += 1
+            if i == 4 ** j:
+                print(i, 4 ** j)
+                j += 1
+                i = 0
+                temp_wt_dic = {f"{j}": temp_wt_list}
+                wt_dic.update(temp_wt_dic)
+                projection_list = []
+                for m in range(len(temp_wt_list)):
+                    print("analyzing",analyze_wavelet(temp_wt_list[m], threshold=self.threshold))
+                    projection_list += analyze_wavelet(temp_wt_list[m], threshold=self.threshold)
+                temp_wt_list = []
+        return wt_dic
 
-            for j in range(4**i):
-                previous_image = len(record_quadrant)
-                if record_quadrant[j + previous_image-1] == 1:
-                    #initialize data aquisation
-                    cd = control_DMD(pattern_list[previous_image+j-1], "adaptive_sampling", 1, 10)
-                    SR = StreamRaspberry()
-                    data_one, data_two = SR.get_data(num_frames)  # check the correspondence of photodiode and pin
-                    cd.execute(0, num_frames)
-                    # prepare pattern
-                    positive_hadamard = map(rescale, pattern_list[previous_image+j-1])
-                    negative_hadamard = map(rescale, negative_pattern_list[previous_image+j-1])
-                    #calcualte intensity
-                    intensity = (data_one-data_two)/(data_one+data_two)
-                    # calculate image
-                    image = combine_data(positive_hadamard, negative_hadamard, intensity)
-                    # extract image from larger image(remember we only sample a fraction)
-                    row, col = map_to_position(j, 4**i)
-                    target_image = image[row*self.Hadamard_size:(row+1)*self.Hadamard_size,
-                                   col*self.Hadamard_size:(col+1)*self.Hadamard_size]
-                    # wavelet transform
-                    list_wavelet = wavelet_transform_level_one(target_image)
-                    wavelet_info.append(list_wavelet)
-                    # devide image into four quadrant and calculate their threshold
-                    # if below default threshold, append 0 to 'record_quadrant' list.
-                    sliced_matrix = slice_matrix(np.sum(list_wavelet, axis=0), 4)
-                    record_quadrant = record_quadrant+list(map(analyze_threshold,sliced_matrix))
-                # if there are no relevance, append zero matrix that makes no effect in further action.
-                elif record_quadrant[j+previous_image-1] == 0:
-                    wavelet_shape = self.image_resolution/2**(i+1)
-                    fill_wavelet = np.zeros((wavelet_shape, wavelet_shape))
-                    wavelet_info.append((fill_wavelet, fill_wavelet,fill_wavelet,fill_wavelet))
-
-            return wavelet_info
-    def inverse_wavelet_transform(self, wavelet_info):
-        """
-        recombine wavelet transform to reconstruct image.
-        :param wavelet_info: a list contain the information of wavelet transform[(coarse image, horizontal, vertial, diagonal)...]
-        :return: reconstructed image
-        """
-        recover_list = []
-        #define a function to support combine fractional image to whole picture
-        def recombine_data(data_tuple):
-            a,b,c,d = data_tuple
-            new_list = []
-            for i in range(len(a)):
-                top = np.hstack((a[i],b[i]))
-                bottom = np.hstack((c[i],d[i]))
-                recover = np.vstack((top, bottom))
-                new_list.append(recover)
-            return new_list
-        counter = 0
-        recover_list.append(wavelet_info[0])
-        wavelet_info.pop(0)
-        while len(wavelet_info) != 0:
-            counter+=1
-            temp_wavelet_data = wavelet_info[0:4**counter]
-            del wavelet_info[0:4**counter]
-
-            for i in range(counter):
-                # now I create an array to inform the correspondant index within wavelet list.
-                # The number of fractional wavelet(or image) is 4**k in k stage in total.
-                # Further, the order of each fraction is from top left to bottom right.
-                # hence, for 4**k stage, there will be at most k repeatation happen.
-                # for example if we are recombine stage 2  wavelet information.
-                # 4**2 = 16 wavelet fraction in total.
-                # we recursively comobine wavelet twice(16->4, 4->1).
-                # The remained wavelet is the expected wavelet.
-
-                # We apply this procedure to horizontal, vertial, and diagonal wavelet respectively.
-                num_fraction = 4**(counter-i)
-                fraction_array = np.linspace(0,num_fraction-1,num_fraction).astype(int)
-                fraction_array = fraction_array.reshape(int(len(fraction_array)/4,4))
-                for j in range(len(fraction_array)):
-                    for k in range(len(fraction_array[j])):
-                        temp_list = []
-                        temp_list.append(temp_wavelet_data[j][k])
-                        temp_wavelet_data.append(recombine_data(temp_list))
-                del temp_wavelet_data[0:4**(counter-i)]
-            recover_list.append(temp_wavelet_data[0])
-        ###############################################inverse wavelet transform
-        image = recover_list[-1][0]
-        for i in range(len(recover_list)):
-            image = inverse_wavelet_trasform(image,
-                                             reshape_image[i][1],
-                                             reshape_image[i][2],
-                                             reshape_image[i][3]
-                                             )
-        return image
+    def reconstruct_image_from_wavelet(self, wt_dic):
+        reconstruction = []
+        for i in range(len(wt_dic)):
+            print("len", len(wt_dic))
+            temp_wt = wt_dic[f"{i + 1}"]
+            temp_reconstruction = []
+            for j in range(len(temp_wt)):
+                print("j", j)
+                image, hor, ver, dia = temp_wt[j]
+                summed_edge = hor + ver + dia
+                print("calculating_edge:", np.sum(summed_edge))
+                reconstructed_image = inverse_wavelet_trasform(image, hor, ver, dia)
+                temp_reconstruction.append(reconstructed_image)
+            reconstruction.append(np.sum(np.array(temp_reconstruction), axis=0))
+        return reconstruction
 
 def embed_in_corner(smaller_matrices, size, position):
     # Convert the smaller_matrices to a list for easy indexing
@@ -191,3 +131,33 @@ def map_to_position(n, width):
     row = n // width
     col = n % width
     return row, col
+def analyze_wavelet(wavelet, threshold=1):
+    _, hor, ver, dia = wavelet
+    combine_wavelet = hor+ver+dia
+    sliced_matrix = split_matrix(combine_wavelet)
+    projection_index = []
+    for i in range(len(sliced_matrix)):
+        summed_value = np.sum(sliced_matrix[i])
+        print(summed_value)
+        if np.abs(summed_value)<threshold:
+            projection_index.append(0)
+        else:
+            projection_index.append(1)
+    return projection_index
+def wavelet_transform_level_one(matrix):
+    # Apply single level Discrete Wavelet Transform
+    coeffs = pywt.dwt2(matrix, 'db1')  # 'db1' refers to the Daubechies wavelet with one vanishing moment.
+    cA, (cH, cV, cD) = coeffs  # cA: approximation, cH: horizontal details, cV: vertical details, cD: diagonal details
+
+    return cA, cH, cV, cD
+def inverse_wavelet_trasform(cA, cH, cV, cD):
+    reconstructed_data_2D = pywt.idwt2((cA, (cH, cV, cD)), 'db1')
+    return reconstructed_data_2D
+
+def split_matrix(arr):
+    width = arr.shape[0]
+    top_left, top_right, bot_left, bot_right = (arr[0:int(width/2), 0:int(width/2)],
+                                                arr[0:int(width/2), int(width/2):width],
+                                                arr[int(width/2):width, 0:int(width/2)],
+                                                arr[int(width/2):width,int(width/2):width])
+    return  top_left, top_right, bot_left, bot_right
