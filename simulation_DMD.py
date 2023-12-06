@@ -86,7 +86,8 @@ def reconstruction_image(pattern_array, intensity_array):
     return image_matrix
 
 
-def plot_pixel(image_matrix):
+def plot_pixel(image_matrix, title=None):
+    plt.title(title)
     plt.imshow(image_matrix, cmap="gray")
     plt.show()
 
@@ -115,7 +116,6 @@ class SimulationCompressingImage:
             reverse_signal = photo_diode_reverse_signal + reverse_signal_nose
             image.append((signal-reverse_signal)*(mask-reverse_mask))
         image = np.sum(np.array(image), axis=0) / (int(len(pattern) * sampling_rate))
-        image = image + abs(np.min(image))
         return image
     def fourier(self,pattern, reverse_pattern, sampling_rate=1, noise_rate=0):
         image = []

@@ -5,6 +5,10 @@ import generate_pattern
 import matplotlib.pyplot as plt
 from skimage import transform
 from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.colors as colors
+from simulation_DMD import PSNR
+import cv2
+
 def get_calibration():
     data_one = np.array([])
     data_two = np.array([])
@@ -20,42 +24,50 @@ def get_data(count, pixel, group):
     data_two = np.array([])
     for i in range(count):
         temp_data_one = np.genfromtxt(f"{pixel}_{group}_one_data_{i+1}.csv",delimiter=',')
-        temp_data_one = temp_data_one[0:4096]
         temp_data_two = np.genfromtxt(f'{pixel}_{group}_two_data_{i+1}.csv',delimiter=',')
-        temp_data_two = temp_data_two[0:4096]
         data_one = np.hstack((data_one, temp_data_one))
         data_two = np.hstack((data_two, temp_data_two))
     print(len(data_one))
     return data_one, data_two
-def combine_data(intensity, size):
-    positive_pattern, negative_pattern = generate_pattern.DmdPattern('hadamard', size, size).execute()
+
+def combine_data(intensity, size, length=1, name="hadamard"):
+    positive_pattern, negative_pattern = generate_pattern.DmdPattern(name, size, size).execute(length)
     image = []
-    i=0
+    pattern = np.array(positive_pattern)-np.array(negative_pattern)
     length_pattern = len(positive_pattern)
     intensity_length = len(intensity)
-    while i<intensity_length:
-        image.append((intensity[i]*(positive_pattern[0]-negative_pattern[0])).astype(np.float16))
-        i+=1
-        #print(positive_pattern[0])
-        del positive_pattern[0]
-        del negative_pattern[0]
-        #print(positive_pattern[0])
+    for i in range(len(intensity)):
+        image.append((intensity[i]*pattern[i]).astype(np.float64))
+    image = np.sum(np.array(image), axis=0)/length_pattern
+    return  image
+
+def combine_data_batch(intensity, positive, negative, length=1, name="hadamard"):
+    image = []
+    pattern = np.array(positive)-np.array(negative)
+    length_pattern = len(positive)
+    intensity_length = len(intensity)
+    print("here")
+    for i in range(int(len(positive)*length)):
+        image.append((intensity[i]*pattern[i]).astype(np.float64))
     image = np.sum(np.array(image), axis=0)/length_pattern
     return  image
 def plot_pixel(image_matrix):
-    cdict = {'red': ((0.0, 0.0, 0.0),
-                     (1.0, 1.0, 1.0)),
-             'green': ((0.0, 0.0, 0.0),
-                       (1.0, 0.0, 0.0)),
-             'blue': ((0.0, 0.0, 0.0),
-                      (1.0, 0.0, 0.0))}
+    # Create a figure and an axes instance
+    fig, ax = plt.subplots()
 
-    red_cmap = LinearSegmentedColormap('RedMap', segmentdata=cdict, N=256)
+    # Display the image
+    im = ax.imshow(image_matrix, cmap='hot')
 
-    plt.imshow(image_matrix, cmap="gray")
+    # Add title with PSNR value (assuming mask_length is a list and i is the index)
+    ax.set_title(f"Multimodal")
+
+    # Add a colorbar
+    fig.colorbar(im, ax=ax)
+
+    # Show the plot
     plt.show()
 
-def smooth_image(matrix, kernel_size=7):
+def smooth_image(matrix, kernel_size=3):
     if kernel_size % 2 == 0:
         raise ValueError("Kernel size should be odd")
 
@@ -92,6 +104,47 @@ def replace_smallest(arr):
     return arr
 def remove_row(arr, row_to_remove):
     return np.delete(arr, row_to_remove, axis=0)
+
+def remove_tw(arr):
+    ave = np.average(arr)
+    arr[0][0] = ave
+    arr[0][1] = ave
+    arr[0][2] = ave
+    arr[0][3] = ave
+    arr[0][31] = ave
+    arr[0][32] = ave
+    arr[0][33] = ave
+    arr[0][34] = ave
+    arr[32][32] = ave
+    arr[32][34] = ave
+    arr[32][0] = ave
+    arr[32][1] = ave
+    arr[32][2] = ave
+    arr[32][3] = ave
+    arr = replace_smallest(arr)
+
+    return arr
+def remove_on(arr):
+    ave = np.average(arr)
+    arr[0][0] = ave
+    arr[0][64] = ave
+    arr[64][0] = ave
+    arr [64][64] = ave
+    arr [64][1] = ave
+    arr [64][65] = ave
+    arr [64][66] = ave
+    return arr
+def rescale_2d_array(arr):
+    # Normalizing the array to [0, 1]
+    min_val = arr.min()
+    max_val = arr.max()
+    normalized_arr = (arr - min_val) / (max_val - min_val)
+
+    # Rescaling to [-255, 255]
+    rescaled_arr = (normalized_arr * 255)
+
+    return rescaled_arr
+
 def embed(pattern):
     height,width = pattern[0].shape
     DMD_height = 1140
@@ -118,21 +171,75 @@ def fourier_transform(image):
     fourier_spectrum = 20 * np.log(np.abs(fshift))
     ifft = np.fft.ifft2(image)
     ifshit = np.fft.ifftshift(ifft)
+    ifshit = np.abs(ifshit)
+    ave = np.average(ifshit)
+    #ifshit[64][64] = ave
+    return  fourier_spectrum, ifshit
+def average_t(arr):
+    ave = np.average(arr)
+    arr[0][0] = ave
+    arr[0][8] = ave
+    arr[8][8] = ave
+    arr[8][0] = ave
+    return  arr
+def main_sixteen():
 
-    return  fourier_spectrum, np.abs(ifshit)
-def main():
+    data_one, data_two = get_data(1, 16, 1)
+    image = combine_data((data_one-data_two)/(data_one+data_two), size=16)
+   # fourier,inver = fourier_transform(image)
+    #image = remove_tw(image)
+    image = average_t(image)
+    #fourier = remove_tw(fourier)
+    #image= smooth_image(image)
+    plot_pixel(np.log(image))
+    #plot_pixel(inver)
+def main_thirty_two():
+    data_one, data_two = get_data(1, 32, 1)
+    one_frame_size = 1024
+    for i in range(1):
+        print(one_frame_size*i)
+        temp_data_one = data_one[one_frame_size*i:one_frame_size*(i+1)]
+        temp_data_two = data_two[one_frame_size*i:one_frame_size*(i+1)]
+        image = combine_data((temp_data_two-temp_data_one), size=32)
+        plot_pixel(image)
+def main_six_four(name):
+    data_one, data_two = get_data(1, 64, 6)
+    one_frame_size = 4096
+    for i in range(1):
+        print(one_frame_size*i)
+        temp_data_one = data_one[one_frame_size*i:one_frame_size*(i+1)]
+        temp_data_two = data_two[one_frame_size*i:one_frame_size*(i+1)]
+        image = combine_data((temp_data_two-temp_data_one), size=64, name=name)
+        image = remove_tw(image)
+        print('f')
+        # fourier = remove_tw(fourier)
+        #image= smooth_image(image)
+        plot_pixel(image)
+def main_one_two_eight():
+    data_one, data_two = get_data(4, 128, 12)
+    image = combine_data((data_two - data_one) , size=128)
+    image = remove_on(image)
+    image[64] = np.average(image)
+    plot_pixel(np.log(image))
 
-    data_one, data_two = get_data(1, 128, 31)
-    image = combine_data((data_one-data_two)/(data_one+data_two), size=256)
-    image = replace_largest(image)
-    image = replace_smallest(image)
-    image = replace_smallest(image)
-    image = replace_smallest(image)
-    fourier_image, inverse = fourier_transform(image)
-    image = smooth_image(image)
-    #fourier_image = smooth_image(fourier_image)
-    #image = smooth_image(image)
+def main_one_two_five():
+    data_one, data_two = get_data(4, 256, 1)
+    image = combine_data((data_two - data_one)/(data_two+data_one), size=256, length=1)
+    fourier, inver = fourier_transform(image)
+    print(image)
+    # image = remove_tw(image)
+    # image = remove_tw(image)
+    # fourier = remove_tw(fourier)
+    # image= smooth_image(image)
     plot_pixel(image)
-    #plot_pixel(fourier_image)
-    #plot_pixel(inverse)
-main()
+    plot_pixel(inver)
+
+for i in range(40):
+    try:
+        data_one, data_two = get_data(4, 128, i+1)
+        combined_data = combine_data_batch((data_one-data_two), positive, negative)
+        rescaled_data = rescale_2d_array(combined_data)
+
+        plot_pixel(rescaled_data)
+    except FileNotFoundError:
+        print("not found pass")
