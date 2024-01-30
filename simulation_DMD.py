@@ -10,6 +10,7 @@ import numpy as np
 from generate_pattern import DmdPattern
 from PIL import Image, ImageDraw
 import cv2
+from skimage.metrics import structural_similarity as ssim
 def random_image_with_shapes(width, height, num_shapes=5):
     # Create a random background
     background = np.random.randint(0, 256, (width, height, 3), dtype=np.uint8)
@@ -53,7 +54,7 @@ def random_image_with_shapes(width, height, num_shapes=5):
     # Randomly draw shapes
     for _ in range(num_shapes):
         # Determine shape type (either rectangle or ellipse)
-        shape_type = np.random.choice(["rectangle", "ellipse"])
+        shape_type = np.random.choice(["rectangle", "ellipse", "triangle"])
 
         # Randomly determine top-left and bottom-right points for the shape
         x1, y1 = np.random.randint(0, width-30), np.random.randint(0, height-30)
@@ -139,6 +140,67 @@ class SimulationCompressingImage:
         image = np.sum(np.array(image), axis=0) / (int(len(pattern) * sampling_rate))
         image = image + abs(np.min(image))
         return image
+    def image_with_different_sampling_rate(self, pattern, reverse_pattern, noise_rate=0, num_image=1):
+        image = []
+        image_width, image_height = self.simulation_image.shape
+        num_pixel = image_width**2
+
+        summed_pattern = []
+        for i in range(int(len(pattern))):
+            mask = resize(pattern[i], image_width, image_height)
+            reverse_mask = resize(reverse_pattern[i], image_width, image_height)
+            fractional_signal = np.sum(mask * self.simulation_image)
+            reverse_fractional_signal = np.sum(reverse_mask * self.simulation_image)
+            photo_diode_signal =  fractional_signal
+            photo_diode_reverse_signal = reverse_fractional_signal
+
+            signal_noise = np.random.rand() * noise_rate
+            reverse_signal_noise = np.random.rand() * noise_rate
+
+            signal = photo_diode_signal + signal_noise
+            reverse_signal = photo_diode_reverse_signal + reverse_signal_noise
+
+            image.append((signal - reverse_signal) * (mask - reverse_mask))
+            summed_pattern.append(mask+reverse_mask)
+        image_list = []
+        pattern_length = len(summed_pattern)
+        steps = 1/num_image
+        for i in range(1, num_image):
+            print(int(pattern_length*steps))
+            temp_pattern_array = np.array(summed_pattern)[0:int(pattern_length*steps)]
+            image_list.append(np.sum(temp_pattern_array), axis=0)
+            image_list.append(np.sum(np.array(image), axis=0))
+        return image_list
+    def oneside(self, pattern, sampling_rate=1, noise_rate=0):
+        image = []
+        image_width, image_height = self.simulation_image.shape
+        num_pixel = image_width**2
+
+        summed_pattern = []
+        for i in range(int(len(pattern) * sampling_rate)):
+            mask = resize(pattern[i], image_width, image_height)
+            fractional_signal = np.sum(mask * self.simulation_image)/num_pixel
+            photo_diode_signal =  fractional_signal
+
+            signal_noise = np.random.rand() * noise_rate
+
+            signal = photo_diode_signal + signal_noise
+
+            image.append(signal * (mask))
+            if np.mod(i,4)==0:
+                summed_pattern.append(-1*mask)
+            elif np.mod(i,4)==1:
+                summed_pattern.append(1j * mask)
+            elif np.mod(i,4)==2:
+                summed_pattern.append(mask)
+            elif np.mod(i,4)==3:
+                summed_pattern.append(-1j*mask)
+        summed_matrix = np.sum(np.array(summed_pattern), axis=0)
+
+        image = np.sum(np.array(image), axis=0) / (int(len(pattern) * sampling_rate))
+        #image = np.sum(np.array(image), axis=0) / summed_matrix
+        #image = np.clip(image / image.max() * 255, 0, 255).astype(np.uint8)
+        return image
 
 class PSNR:
     def __init__(self, ground_image, reconstruction_image):
@@ -170,5 +232,23 @@ class PSNR:
             return float('inf')
 
         return 10 * np.log10(np.max(self.ground_image) ** 2 / mean_square_error)
+def calculate_ssim(imageA, imageB):
+    """
+    Calculate the Structural Similarity Index (SSIM) between two images.
+    """
+    score, _ = ssim(imageA, imageB, full=True)
+    return score
+
+
+def mean_squared_error(imageA, imageB):
+    """
+    Calculate the Mean Squared Error between two images.
+    Assumes both images are the same size and are numpy arrays.
+    """
+    # Calculate the squared difference between the images
+    err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
+    err /= float(imageA.shape[0] * imageA.shape[1])
+
+    return err
 def resize(input_image, width, height):
     return cv2.resize(input_image, (width, height), interpolation=cv2.INTER_LINEAR)
