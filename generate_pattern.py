@@ -80,6 +80,36 @@ def three_dimension(pattern):
     def inner_loop(two_dimension_pattern):
         return two_dimension_pattern.T[:,:,np.newaxis]
     return list(map(inner_loop, pattern))
+##########################This section generates the superpixel patterns
+def superpixel(phase_matrix, pixel_size=4):
+    """
+    Input
+    :param pixel_size:
+    :return:
+    """
+    phase_set = np.array(find_unique_numbers_2d(phase_matrix))
+    one_super_pixel = np.arange(0,pixel_size**2,1)/pixel_size**2*np.pi
+
+
+    return
+def find_unique_numbers_2d(array_2d):
+    unique_numbers = set()
+
+    for row in array_2d:
+        unique_numbers.update(row)
+
+    return list(unique_numbers)
+
+def replace_number_with_array(original_matrix, target_number, replacement_array):
+    def replace_row(row):
+        return [
+            replacement_array[k] if cell == target_number else cell
+            for k, cell in enumerate(row)
+        ]
+
+    result_matrix = list(map(replace_row, original_matrix))
+    return result_matrix
+##########################
 def generate_fourier_mask(u,v,N, phi):
     """
     Generate a Fourier mask for a square image of size N pixels.
