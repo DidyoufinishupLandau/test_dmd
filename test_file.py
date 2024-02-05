@@ -50,4 +50,3 @@ def plot_complex_array(complex_array, figure_size=(20, 20)):
     plt.title('Complex Numbers in Complex Plane')
     plt.grid(True)
     plt.show()
-plot_complex_array(sum_array)
