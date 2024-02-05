@@ -15,3 +15,5 @@ cd = control_DMD(hadamard_pattern, project_name = "my_project", group =  2, main
 #start project and save data into csv file sent from photodiode.
 
 cd.execute(measurement_size=int(4096))
+
+2/5/2024 version 1.0
