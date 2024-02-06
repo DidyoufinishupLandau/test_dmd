@@ -3,52 +3,8 @@ from itertools import combinations
 from decimal import Decimal, getcontext
 import matplotlib.pyplot as plt
 from scipy.special import genlaguerre
-from DMD_driver import DMD_driver
-import time
-from simulation_DMD import plot_pixel
 ########################################################
-class SuperpixelPattern:
-    def __init__(self, superpixel_size=4):
-        self.x = np.e**(np.arange(0,superpixel_size**2,1)*2*np.pi/superpixel_size**2*1j)/superpixel_size**2
-    def superpixel_pattern(self, phase_matrix):
-        target_matrix = phase_to_superpixel(phase_matrix, self.x)
-        return target_matrix[:, :, np.newaxis].astype(np.uint8)
 
-    def plane_wave(self, phase):
-        return_array = np.exp(1j*phase)*np.ones((228, 286))
-        target_matrix = phase_to_superpixel(return_array, self.x)
-        return target_matrix[:, :, np.newaxis].astype(np.uint8)
-
-    def alignment_pattern_horizontal(self):
-        a = np.ones((912, 4)) * 255
-        b = np.zeros((912, 4))
-        return_array = np.zeros((912, 0))
-        for i in range(143):
-            return_array = np.hstack((return_array, a))
-            return_array = np.hstack((return_array, b))
-        return return_array[:, :, np.newaxis].astype(np.uint8)
-
-    def alignment_pattern_vertical(self):
-        a = np.ones((4, 1144)) * 255
-        b = np.zeros((4, 1144))
-        return_array = np.zeros((0, 1144))
-        for i in range(114):
-            return_array = np.vstack((return_array, a))
-            return_array = np.vstack((return_array, b))
-        return return_array[:, :, np.newaxis].astype(np.uint8)
-    def LG_mode(self,l ,p, range=(-3,3), plot=True):
-        min,max = range
-        x = np.linspace(min, max, 285)
-        y = np.linspace(min, max, 228)
-        X, Y = np.meshgrid(x, y)
-        Z = gaussian_laguerre_cartesian(l, p, X, Y)
-        Z = Z / np.max(abs(Z))
-        target_matrix = phase_to_superpixel(Z, self.x)
-        Z = abs(Z)
-        if plot:
-            plot_gaussian_laguerre_cartesian(l,p, X, Y, Z)
-            plot_pixel(target_matrix)
-        return target_matrix[:, :, np.newaxis].astype(np.uint8)
 def get_combination_sums_and_indices(input_list):
     sums_list = []
     indices_list = []
@@ -149,57 +105,3 @@ def phase_to_superpixel(phase_matrix,pixel_phase, error=10**-2):
 
     return two_dimension_superpixel_matrix
 # Example usage:
-def alignment_process():
-    SP = SuperpixelPattern(4)
-    dmd_pattern_one = SP.alignment_pattern_horizontal()
-    dmd_pattern_two = SP.alignment_pattern_vertical()
-
-    dmd = DMD_driver()
-    # Create a default project
-    dmd.create_project(project_name='test_project')
-    dmd.create_main_sequence(seq_rep_count=1)
-    # Image
-    count = 0
-    reference_pattern = SP.plane_wave(0)
-    for i in range(0, 200):
-        count += 1
-        dmd.add_sequence_item(image=dmd_pattern_one, seq_id=1, frame_time=2000)
-        dmd.add_sequence_item(image=dmd_pattern_two, seq_id=1, frame_time=2000)
-        dmd.add_sequence_item(image=reference_pattern, seq_id=1, frame_time=2000)
-
-    # Create the main sequence
-    print("start projecting")
-    dmd.my_trigger()
-    dmd.start_projecting()
-    # Stop the sequence
-    time.sleep(500)
-    dmd.stop_projecting()
-
-def target_field():
-    SP = SuperpixelPattern(4)
-
-    dmd_pattern = SP.LG_mode(1,0)
-    dmd = DMD_driver()
-    # Create a default project
-    dmd.create_project(project_name='test_project')
-    dmd.create_main_sequence(seq_rep_count=1)
-    # Image
-    reference_pattern = np.zeros((912, 1140))[:, :, np.newaxis].astype(np.uint8)
-    count = 0
-    for i in range(0, 500):
-        count += 1
-        dmd.add_sequence_item(image=dmd_pattern, seq_id=1, frame_time=3000)
-        dmd.add_sequence_item(image=reference_pattern, seq_id=1, frame_time=3000)
-
-    # Create the main sequence
-    print("start projecting")
-    dmd.my_trigger()
-    dmd.start_projecting()
-    # Stop the sequence
-    time.sleep(500)
-    dmd.stop_projecting()
-SP = SuperpixelPattern(4)
-plot_pixel(SP.LG_mode(2,1))
-
-#alignment_process()
-#target_field()

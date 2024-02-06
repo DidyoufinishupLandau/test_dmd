@@ -207,5 +207,8 @@ def target_field():
     # Stop the sequence
     time.sleep(500)
     dmd.stop_projecting()
-alignment_process()
+#alignment_process()
 #target_field()
+from generate_pattern import SuperpixelPattern
+SP = SuperpixelPattern()
+SP.LG_mode(2,1)

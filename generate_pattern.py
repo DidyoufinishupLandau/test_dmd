@@ -2,7 +2,7 @@
 """
 Author: Pan Zhang
 """
-import sys
+from superpixel_utility import *
 import numpy as np
 import scipy
 class DmdPattern():
@@ -76,6 +76,48 @@ class DmdPattern():
                     for k in range(len(phase)):
                         fourier_mask.append(generate_fourier_mask(i,j,self.width,phase[k]))
             return fourier_mask
+class SuperpixelPattern:
+    def __init__(self, superpixel_size=4):
+        self.x = np.e**(np.arange(0,superpixel_size**2,1)*2*np.pi/superpixel_size**2*1j)/superpixel_size**2
+    def superpixel_pattern(self, phase_matrix):
+        target_matrix = phase_to_superpixel(phase_matrix, self.x)
+        return target_matrix[:, :, np.newaxis].astype(np.uint8)
+
+    def plane_wave(self, phase):
+        return_array = np.exp(1j*phase)*np.ones((228, 286))
+        target_matrix = phase_to_superpixel(return_array, self.x)
+        return target_matrix[:, :, np.newaxis].astype(np.uint8)
+
+    def alignment_pattern_horizontal(self):
+        a = np.ones((912, 4)) * 255
+        b = np.zeros((912, 4))
+        return_array = np.zeros((912, 0))
+        for i in range(143):
+            return_array = np.hstack((return_array, a))
+            return_array = np.hstack((return_array, b))
+        return return_array[:, :, np.newaxis].astype(np.uint8)
+
+    def alignment_pattern_vertical(self):
+        a = np.ones((4, 1144)) * 255
+        b = np.zeros((4, 1144))
+        return_array = np.zeros((0, 1144))
+        for i in range(114):
+            return_array = np.vstack((return_array, a))
+            return_array = np.vstack((return_array, b))
+        return return_array[:, :, np.newaxis].astype(np.uint8)
+    def LG_mode(self,l ,p, range=(-3,3), plot=True):
+        min,max = range
+        x = np.linspace(min, max, 285)
+        y = np.linspace(min, max, 228)
+        X, Y = np.meshgrid(x, y)
+        Z = gaussian_laguerre_cartesian(l, p, X, Y)
+        Z = Z / np.max(abs(Z))
+        target_matrix = phase_to_superpixel(Z, self.x)
+        Z = abs(Z)
+        if plot:
+            plot_gaussian_laguerre_cartesian(l,p, X, Y, Z)
+        return target_matrix[:, :, np.newaxis].astype(np.uint8)
+
 
 
 def three_dimension(pattern):
