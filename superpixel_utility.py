@@ -32,15 +32,32 @@ def remove_complex_duplicates(arr,combination, precision=10):
             unique_combination.append(combination[i])
 
     return unique_elements,unique_combination
-
 def gaussian_laguerre_cartesian(l, p, x, y):
+    """
+    Calculate the normalized Laguerre-Gaussian beam in Cartesian coordinates.
+
+    Parameters:
+        l (int): Radial mode parameter.
+        p (int): Azimuthal mode parameter.
+        x (float): x-coordinate.
+        y (float): y-coordinate.
+
+    Returns:
+        complex: Value of the Laguerre-Gaussian beam at given coordinates.
+    """
+    # Calculate the squared radial distance
     rho_squared = x ** 2 + y ** 2
-    laguerre_term = genlaguerre(p, l)(2*rho_squared)
+
+    # Calculate the Laguerre polynomial term
+    laguerre_term = genlaguerre(p, l)(rho_squared)
+
+    # Calculate the angular term
     angular_term = np.exp(1j * l * np.arctan2(y, x))
-    #Normalization
 
-    return np.exp(-rho_squared) * laguerre_term * angular_term
+    # Normalize the Laguerre-Gaussian beam
+    normalized_beam = laguerre_term * angular_term
 
+    return normalized_beam
 def plot_gaussian_laguerre_cartesian(l, p, X, Y, Z):
 
     plt.contourf(X, Y, Z, cmap='viridis', levels=100)

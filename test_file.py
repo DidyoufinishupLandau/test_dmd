@@ -54,13 +54,33 @@ def plot_complex_array(complex_array, figure_size=(20, 20)):
     plt.grid(True)
     plt.show()
 
-def gaussian_laguerre_cartesian(l, p, x, y):
-    rho_squared = x ** 2 + y ** 2
-    laguerre_term = genlaguerre(p, l)(2*rho_squared)
-    angular_term = np.exp(1j * l * np.arctan2(y, x))
-    #Normalization
 
-    return np.exp(-rho_squared) * laguerre_term * angular_term
+def gaussian_laguerre_cartesian(l, p, x, y):
+    """
+    Calculate the normalized Laguerre-Gaussian beam in Cartesian coordinates.
+
+    Parameters:
+        l (int): Radial mode parameter.
+        p (int): Azimuthal mode parameter.
+        x (float): x-coordinate.
+        y (float): y-coordinate.
+
+    Returns:
+        complex: Value of the Laguerre-Gaussian beam at given coordinates.
+    """
+    # Calculate the squared radial distance
+    rho_squared = x ** 2 + y ** 2
+
+    # Calculate the Laguerre polynomial term
+    laguerre_term = genlaguerre(p, l)(2*rho_squared)
+
+    # Calculate the angular term
+    angular_term = np.exp(1j * l * np.arctan2(y, x))
+
+    # Normalize the Laguerre-Gaussian beam
+    normalized_beam = np.exp(-rho_squared)*laguerre_term * angular_term
+
+    return normalized_beam
 def plane_wave():
     return_array = np.zeros((228,286))
     return return_array
@@ -83,12 +103,12 @@ def alignment_pattern_vertical():
 
 
 def plot_gaussian_laguerre_cartesian(l, p):
-    x = np.linspace(-3,3 , 285)
-    y = np.linspace(-3, 3, 228)
+    x = np.linspace(-2,2, 285)
+    y = np.linspace(-2, 2, 228)
     X, Y = np.meshgrid(x, y)
     Z = gaussian_laguerre_cartesian(l, p, X, Y)
     normalized_E_field = Z/np.max(abs(Z))
-    Z = abs(normalized_E_field)
+    Z = np.abs(normalized_E_field)
 
     plt.contourf(X, Y, Z, cmap='viridis', levels=100)
     plt.colorbar(label='Intensity')
@@ -152,8 +172,8 @@ def phase_to_superpixel(phase_matrix, error=10**-2):
 
     return two_dimension_superpixel_matrix
 # Example usage:
-l = 2
-p = 1
+l = 1
+p = 2
 sum_array, combo = get_combination_sums_and_indices(x)
 sum_array, combo = remove_complex_duplicates(sum_array, combo)
 normalized_E_field = plot_gaussian_laguerre_cartesian(l, p)
@@ -209,6 +229,3 @@ def target_field():
     dmd.stop_projecting()
 #alignment_process()
 #target_field()
-from generate_pattern import SuperpixelPattern
-SP = SuperpixelPattern()
-SP.LG_mode(2,1)
