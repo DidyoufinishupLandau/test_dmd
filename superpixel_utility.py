@@ -1,20 +1,58 @@
 import numpy as np
 from itertools import combinations
-import math
 from decimal import Decimal, getcontext
 import matplotlib.pyplot as plt
 from scipy.special import genlaguerre
-from simulation_DMD import plot_pixel
 from DMD_driver import DMD_driver
 import time
-y = np.e**(np.arange(0,9,1)*2*np.pi/9*1j)
-y = np.e**(np.arange(0,9,1)*2*np.pi/9*1j)/9
-x = np.e**(np.arange(0,16,1)*2*np.pi/16*1j)/16
-a = np.array([1,2,3])
+from simulation_DMD import plot_pixel
+########################################################
+class SuperpixelPattern:
+    def __init__(self, superpixel_size=4):
+        self.x = np.e**(np.arange(0,superpixel_size**2,1)*2*np.pi/superpixel_size**2*1j)/superpixel_size**2
+    def superpixel_pattern(self, phase_matrix):
+        target_matrix = phase_to_superpixel(phase_matrix, self.x)
+        return target_matrix[:, :, np.newaxis].astype(np.uint8)
 
+    def plane_wave(self, phase):
+        return_array = np.exp(1j*phase)*np.ones((228, 286))
+        target_matrix = phase_to_superpixel(return_array, self.x)
+        return target_matrix[:, :, np.newaxis].astype(np.uint8)
+
+    def alignment_pattern_horizontal(self):
+        a = np.ones((912, 4)) * 255
+        b = np.zeros((912, 4))
+        return_array = np.zeros((912, 0))
+        for i in range(143):
+            return_array = np.hstack((return_array, a))
+            return_array = np.hstack((return_array, b))
+        return return_array[:, :, np.newaxis].astype(np.uint8)
+
+    def alignment_pattern_vertical(self):
+        a = np.ones((4, 1144)) * 255
+        b = np.zeros((4, 1144))
+        return_array = np.zeros((0, 1144))
+        for i in range(114):
+            return_array = np.vstack((return_array, a))
+            return_array = np.vstack((return_array, b))
+        return return_array[:, :, np.newaxis].astype(np.uint8)
+    def LG_mode(self,l ,p, range=(-3,3), plot=True):
+        min,max = range
+        x = np.linspace(min, max, 285)
+        y = np.linspace(min, max, 228)
+        X, Y = np.meshgrid(x, y)
+        Z = gaussian_laguerre_cartesian(l, p, X, Y)
+        Z = Z / np.max(abs(Z))
+        target_matrix = phase_to_superpixel(Z, self.x)
+        Z = abs(Z)
+        if plot:
+            plot_gaussian_laguerre_cartesian(l,p, X, Y, Z)
+            plot_pixel(target_matrix)
+        return target_matrix[:, :, np.newaxis].astype(np.uint8)
 def get_combination_sums_and_indices(input_list):
     sums_list = []
     indices_list = []
+
     for r in range(1, len(input_list) + 1):
         for combo_indices in combinations(range(len(input_list)), r):
             combo_sum = sum(input_list[i] for i in combo_indices)
@@ -22,14 +60,12 @@ def get_combination_sums_and_indices(input_list):
             indices_list.append(list(combo_indices))
 
     return sums_list, indices_list
-
-
-
 def remove_complex_duplicates(arr,combination, precision=10):
     getcontext().prec = precision
     unique_elements = []
     unique_combination = []
     seen_elements = set()
+
     for i, num in enumerate(arr):
         rounded_real = round(Decimal(num.real), precision)
         rounded_imag = round(Decimal(num.imag), precision)
@@ -40,19 +76,6 @@ def remove_complex_duplicates(arr,combination, precision=10):
             unique_combination.append(combination[i])
 
     return unique_elements,unique_combination
-sum_array, combo = get_combination_sums_and_indices(x)
-sum_array, combo = remove_complex_duplicates(sum_array, combo)
-
-def plot_complex_array(complex_array, figure_size=(20, 20)):
-    real_part = [num.real for num in complex_array]
-    imag_part = [num.imag for num in complex_array]
-    plt.figure(figsize=figure_size)
-    plt.scatter(real_part, imag_part, marker='x', color='blue')
-    plt.xlabel('Real Part')
-    plt.ylabel('Imaginary Part')
-    plt.title('Complex Numbers in Complex Plane')
-    plt.grid(True)
-    plt.show()
 
 def gaussian_laguerre_cartesian(l, p, x, y):
     rho_squared = x ** 2 + y ** 2
@@ -61,34 +84,8 @@ def gaussian_laguerre_cartesian(l, p, x, y):
     #Normalization
 
     return np.exp(-rho_squared) * laguerre_term * angular_term
-def plane_wave():
-    return_array = np.zeros((228,286))
-    return return_array
-def alignment_pattern_horizontal():
-    a = np.ones((912,4))*255
-    b = np.zeros((912,4))
-    return_array = np.zeros((912,0))
-    for i in range(143):
-        return_array = np.hstack((return_array,a))
-        return_array = np.hstack((return_array,b))
-    return return_array[:,:, np.newaxis].astype(np.uint8)
-def alignment_pattern_vertical():
-    a = np.ones((4,1144))*255
-    b = np.zeros((4,1144))
-    return_array = np.zeros((0,1144))
-    for i in range(114):
-        return_array = np.vstack((return_array,a))
-        return_array = np.vstack((return_array,b))
-    return return_array[:,:, np.newaxis].astype(np.uint8)
 
-
-def plot_gaussian_laguerre_cartesian(l, p):
-    x = np.linspace(-3,3 , 285)
-    y = np.linspace(-3, 3, 228)
-    X, Y = np.meshgrid(x, y)
-    Z = gaussian_laguerre_cartesian(l, p, X, Y)
-    normalized_E_field = Z/np.max(abs(Z))
-    Z = abs(normalized_E_field)
+def plot_gaussian_laguerre_cartesian(l, p, X, Y, Z):
 
     plt.contourf(X, Y, Z, cmap='viridis', levels=100)
     plt.colorbar(label='Intensity')
@@ -96,8 +93,8 @@ def plot_gaussian_laguerre_cartesian(l, p):
     plt.xlabel('X')
     plt.ylabel('Y')
     plt.show()
-    return normalized_E_field
-def phase_to_superpixel(phase_matrix, error=10**-2):
+    return None
+def phase_to_superpixel(phase_matrix,pixel_phase, error=10**-2):
     """
     match the element in phase matrix with elements in the complex plan
     within given error margin.
@@ -108,7 +105,7 @@ def phase_to_superpixel(phase_matrix, error=10**-2):
     superpixel_matrix = []
     error_map = []
     error_scale = np.linspace(error, 1,100)
-    sum_array, combo = get_combination_sums_and_indices(x)
+    sum_array, combo = get_combination_sums_and_indices(pixel_phase)
     sum_array, combo = remove_complex_duplicates(sum_array, combo)
     num_row = phase_matrix.shape[0]
     num_column = phase_matrix.shape[1]
@@ -152,18 +149,10 @@ def phase_to_superpixel(phase_matrix, error=10**-2):
 
     return two_dimension_superpixel_matrix
 # Example usage:
-l = 2
-p = 1
-sum_array, combo = get_combination_sums_and_indices(x)
-sum_array, combo = remove_complex_duplicates(sum_array, combo)
-normalized_E_field = plot_gaussian_laguerre_cartesian(l, p)
-#normalized_E_field = plane_wave()
-target_matrix = phase_to_superpixel(normalized_E_field)
-
-plot_pixel(target_matrix)
 def alignment_process():
-    dmd_pattern_one = alignment_pattern_horizontal()
-    dmd_pattern_two = alignment_pattern_vertical()
+    SP = SuperpixelPattern(4)
+    dmd_pattern_one = SP.alignment_pattern_horizontal()
+    dmd_pattern_two = SP.alignment_pattern_vertical()
 
     dmd = DMD_driver()
     # Create a default project
@@ -171,7 +160,7 @@ def alignment_process():
     dmd.create_main_sequence(seq_rep_count=1)
     # Image
     count = 0
-    reference_pattern = target_matrix[:, :, np.newaxis].astype(np.uint8)
+    reference_pattern = SP.plane_wave(0)
     for i in range(0, 200):
         count += 1
         dmd.add_sequence_item(image=dmd_pattern_one, seq_id=1, frame_time=2000)
@@ -185,9 +174,11 @@ def alignment_process():
     # Stop the sequence
     time.sleep(500)
     dmd.stop_projecting()
+
 def target_field():
-    dmd_pattern = target_matrix[:, :, np.newaxis].astype(np.uint8)
-    print(dmd_pattern)
+    SP = SuperpixelPattern(4)
+
+    dmd_pattern = SP.LG_mode(1,0)
     dmd = DMD_driver()
     # Create a default project
     dmd.create_project(project_name='test_project')
@@ -207,5 +198,8 @@ def target_field():
     # Stop the sequence
     time.sleep(500)
     dmd.stop_projecting()
-alignment_process()
+SP = SuperpixelPattern(4)
+plot_pixel(SP.LG_mode(2,1))
+
+#alignment_process()
 #target_field()
