@@ -1,6 +1,6 @@
 const int FROM_DMD_OUT_pin = 2;
-const int PD_pin = A0;
-const int PD_pin_two = A1;
+const int PD_pin = 23;
+const int PD_pin_two = 24;
 String x;
 
 void setup() {

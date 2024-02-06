@@ -76,6 +76,8 @@ class DmdPattern():
                     for k in range(len(phase)):
                         fourier_mask.append(generate_fourier_mask(i,j,self.width,phase[k]))
             return fourier_mask
+
+
 def three_dimension(pattern):
     def inner_loop(two_dimension_pattern):
         return two_dimension_pattern.T[:,:,np.newaxis]

@@ -67,6 +67,3 @@ def smooth_image(matrix, kernel_size=3):
             smoothed[i][j] = sum_val / count
 
     return smoothed
-RR = ReadAndReconstruction(32)
-RR.get_image(4)
-RR.plot()
