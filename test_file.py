@@ -1,17 +1,72 @@
 import numpy as np
 from itertools import combinations
-import math
 from decimal import Decimal, getcontext
 import matplotlib.pyplot as plt
 from scipy.special import genlaguerre
 from simulation_DMD import plot_pixel
 from DMD_driver import DMD_driver
 import time
+from scipy.special import hermite, factorial
+
+
+
+
 y = np.e**(np.arange(0,9,1)*2*np.pi/9*1j)
 y = np.e**(np.arange(0,9,1)*2*np.pi/9*1j)/9
 x = np.e**(np.arange(0,16,1)*2*np.pi/16*1j)/16
 a = np.array([1,2,3])
+def hermite_gaussian(x, y, z, w0, k, m, n):
+    """
+    Generate the intensity distribution of a Hermite-Gaussian beam.
 
+    Parameters:
+        x (numpy.ndarray): x-coordinate.
+        y (numpy.ndarray): y-coordinate.
+        z (float): Axial distance.
+        w0 (float): Beam waist.
+        k (float): Wavenumber.
+        m (int): Mode index in x-direction.
+        n (int): Mode index in y-direction.
+
+    Returns:
+        numpy.ndarray: Intensity distribution.
+    """
+    # Calculate beam radius at distance z
+    x, y = np.meshgrid(x, y)
+    w_z = w0 * np.sqrt(1 + (z * k * w0**2 / 2)**2)
+
+    # Normalization factor
+    C_nm = np.sqrt((2**(-1 - m - n) * factorial(m) * factorial(n)) / (np.pi * factorial(m + n)))
+
+    # Hermite polynomials
+    H_m = hermite(m)(np.sqrt(2) * x / w_z)
+    H_n = hermite(n)(np.sqrt(2) * y / w_z)
+
+    # Gaussian envelope
+    gaussian = np.exp(-(x**2 + y**2) / w_z**2)
+
+    # Intensity distribution
+    intensity = C_nm * H_m * H_n * gaussian
+
+    return np.abs(intensity)**2/np.max(np.abs(intensity))**2, intensity/np.max(np.abs(intensity))
+
+def plot_intensity(x, y, intensity):
+    """
+    Plot the intensity distribution.
+
+    Parameters:
+        x (numpy.ndarray): x-coordinate values.
+        y (numpy.ndarray): y-coordinate values.
+        intensity (numpy.ndarray): Intensity values.
+    """
+    plt.figure(figsize=(8, 6))
+    plt.pcolormesh(x, y, intensity, shading='auto')
+    plt.colorbar(label='Intensity')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Intensity Distribution of Hermite-Gaussian Beam')
+    plt.grid(True)
+    plt.show()
 def get_combination_sums_and_indices(input_list):
     sums_list = []
     indices_list = []
@@ -40,8 +95,7 @@ def remove_complex_duplicates(arr,combination, precision=10):
             unique_combination.append(combination[i])
 
     return unique_elements,unique_combination
-sum_array, combo = get_combination_sums_and_indices(x)
-sum_array, combo = remove_complex_duplicates(sum_array, combo)
+
 
 def plot_complex_array(complex_array, figure_size=(20, 20)):
     real_part = [num.real for num in complex_array]
@@ -103,8 +157,8 @@ def alignment_pattern_vertical():
 
 
 def plot_gaussian_laguerre_cartesian(l, p):
-    x = np.linspace(-2,2, 285)
-    y = np.linspace(-2, 2, 228)
+    x = np.linspace(-3,3, 285)
+    y = np.linspace(-3, 3, 228)
     X, Y = np.meshgrid(x, y)
     Z = gaussian_laguerre_cartesian(l, p, X, Y)
     normalized_E_field = Z/np.max(abs(Z))
@@ -171,16 +225,7 @@ def phase_to_superpixel(phase_matrix, error=10**-2):
             temp_superpixel = np.zeros((4,0))
 
     return two_dimension_superpixel_matrix
-# Example usage:
-l = 1
-p = 2
-sum_array, combo = get_combination_sums_and_indices(x)
-sum_array, combo = remove_complex_duplicates(sum_array, combo)
-normalized_E_field = plot_gaussian_laguerre_cartesian(l, p)
-#normalized_E_field = plane_wave()
-target_matrix = phase_to_superpixel(normalized_E_field)
 
-plot_pixel(target_matrix)
 def alignment_process():
     dmd_pattern_one = alignment_pattern_horizontal()
     dmd_pattern_two = alignment_pattern_vertical()
@@ -191,6 +236,11 @@ def alignment_process():
     dmd.create_main_sequence(seq_rep_count=1)
     # Image
     count = 0
+    sum_array, combo = get_combination_sums_and_indices(x)
+    sum_array, combo = remove_complex_duplicates(sum_array, combo)
+    normalized_E_field = plot_gaussian_laguerre_cartesian(0, 2)
+    # normalized_E_field = plane_wave()
+    target_matrix = phase_to_superpixel(normalized_E_field)
     reference_pattern = target_matrix[:, :, np.newaxis].astype(np.uint8)
     for i in range(0, 200):
         count += 1
@@ -206,6 +256,11 @@ def alignment_process():
     time.sleep(500)
     dmd.stop_projecting()
 def target_field():
+    sum_array, combo = get_combination_sums_and_indices(x)
+    sum_array, combo = remove_complex_duplicates(sum_array, combo)
+    normalized_E_field = plot_gaussian_laguerre_cartesian(0, 2)
+    # normalized_E_field = plane_wave()
+    target_matrix = phase_to_superpixel(normalized_E_field)
     dmd_pattern = target_matrix[:, :, np.newaxis].astype(np.uint8)
     print(dmd_pattern)
     dmd = DMD_driver()
@@ -213,13 +268,55 @@ def target_field():
     dmd.create_project(project_name='test_project')
     dmd.create_main_sequence(seq_rep_count=1)
     # Image
-    reference_pattern = np.zeros((912, 1140))[:, :, np.newaxis].astype(np.uint8)
+    reference_pattern = np.ones((228, 285))
+    reference_pattern = phase_to_superpixel(reference_pattern)[:, :, np.newaxis].astype(np.uint8)
+    plot_pixel(reference_pattern)
     count = 0
     for i in range(0, 500):
         count += 1
         dmd.add_sequence_item(image=dmd_pattern, seq_id=1, frame_time=3000)
         dmd.add_sequence_item(image=reference_pattern, seq_id=1, frame_time=3000)
+    # Create the main sequence
+    print("start projecting")
+    dmd.my_trigger()
+    dmd.start_projecting()
+    # Stop the sequence
+    time.sleep(500)
+    dmd.stop_projecting()
 
+def project_gaussian_hermite_beam():
+    w0 = 1.0  # Beam waist
+    k = 2 * np.pi / 0.5  # Wavenumber
+    gh_target_matrix_list = []
+    for i in range(2):
+        for j in range(2):
+            m = i  # Mode index in x-direction
+            n = j  # Mode index in y-direction
+            # Calculate intensity distribution
+            gaussian_hermite, gaussian_hermite_phase = hermite_gaussian(np.linspace(-5, 5, 285),
+                                                                        np.linspace(-5, 5, 228),
+                                                                        0, w0, k, m, n)
+            gh_target_matrix = phase_to_superpixel(gaussian_hermite_phase)
+            gh_target_matrix_list.append(gh_target_matrix[:, :, np.newaxis].astype(np.uint8))
+
+    # Plot intensity distribution
+    plot_intensity(np.linspace(-5, 5, 285), np.linspace(-5, 5, 228), gaussian_hermite)
+    plot_pixel(gh_target_matrix)
+
+    dmd = DMD_driver()
+    # Create a default project
+    dmd.create_project(project_name='test_project')
+    dmd.create_main_sequence(seq_rep_count=1)
+    # Image
+    reference_pattern = np.ones((228, 285))
+    reference_pattern = phase_to_superpixel(reference_pattern)[:, :, np.newaxis].astype(np.uint8)
+    plot_pixel(reference_pattern)
+    count = 0
+    for i in range(0, 50):
+        count += 1
+        for j in range(len(gh_target_matrix_list)):
+            dmd.add_sequence_item(image=gh_target_matrix_list[j], seq_id=1, frame_time=3000)
+        dmd.add_sequence_item(image=reference_pattern, seq_id=1, frame_time=3000)
     # Create the main sequence
     print("start projecting")
     dmd.my_trigger()
@@ -229,3 +326,4 @@ def target_field():
     dmd.stop_projecting()
 #alignment_process()
 #target_field()
+project_gaussian_hermite_beam()
