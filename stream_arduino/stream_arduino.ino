@@ -1,6 +1,6 @@
 const int FROM_DMD_OUT_pin = 2;
-const int PD_pin = 23;
-const int PD_pin_two = 24;
+const int PD_pin = 12;
+const int PD_pin_two = 14;
 String x;
 
 void setup() {
@@ -21,6 +21,9 @@ void  loop() {
   else if (x == "STOP") {
             detachInterrupt(digitalPinToInterrupt(FROM_DMD_OUT_pin));
         }
+  else if (x == "TEST") {
+    Serial.println("1");
+  }
 }
 void handleInterrupt() {
       int data1 = analogRead(PD_pin);      // Read from first photodiode
