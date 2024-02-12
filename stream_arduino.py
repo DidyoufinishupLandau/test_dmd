@@ -2,11 +2,17 @@ import serial
 import time
 import numpy as np
 class StreamArduino:
-    def __init__(self, port='COM11', baudrate=115200,timeout=100):
+    def __init__(self, port='COM13', baudrate=500000,timeout=100):
         self.arduino = serial.Serial(port=port, baudrate=baudrate, timeout=timeout)
     def start(self):
         self.arduino.write(bytes("START", 'utf-8'))
         print("pycharm call start")
+    def debug(self):
+        self.arduino.write(bytes("TEST", 'utf-8'))
+        print("See '1' imply the script has already successfully uploaded on Board")
+        print(self.arduino.readline().strip())
+        time.sleep(0.5)
+        print("end")
 
     def get_data(self, data_length=4096, iter=1):
         data_one = []
