@@ -3,8 +3,47 @@ from itertools import combinations
 from decimal import Decimal, getcontext
 import matplotlib.pyplot as plt
 from scipy.special import genlaguerre
+from scipy.special import hermite, factorial
+import numpy as np
+import re
 ########################################################
+def parse_complex(complex_str):
+    if complex_str == "0":
+        return complex(0, 0)
+    # Check if the string contains 'i'
+    if 'i' in complex_str:
+        # Use regular expression to extract real and imaginary parts
+        match = re.match(r'([-+]?\d*\.?\d*)([-+]?\d*\.?\d*)i', complex_str)
+        if match:
+            real_part = float(match.group(1))
+            imag_part = float(match.group(2))
+            return complex(real_part, imag_part)
+        else:
+            raise ValueError("Invalid complex number string")
+    else:
+        # Treat the input as a real number and represent it as complex
+        real_part = float(complex_str)
+        return complex(real_part, 0)
+def read_data(filename):
+    # Initialize lists to store data
+    first_column = []
+    rest_columns = []
 
+    # Read data from file
+    with open(filename, 'r') as file:
+        for line in file:
+            data = line.strip().split(',')
+            # Extract the first column
+            first_column.append(parse_complex(data[0]))
+
+            # Extract the rest of the columns
+            rest_columns.append([int(entry) for entry in data[1:]])
+
+        # Convert lists to numpy arrays
+    first_column = np.array(first_column)
+    rest_columns = np.array(rest_columns)
+
+    return first_column, rest_columns
 def get_combination_sums_and_indices(input_list):
     sums_list = []
     indices_list = []
@@ -32,32 +71,6 @@ def remove_complex_duplicates(arr,combination, precision=10):
             unique_combination.append(combination[i])
 
     return unique_elements,unique_combination
-def gaussian_laguerre_cartesian(l, p, x, y):
-    """
-    Calculate the normalized Laguerre-Gaussian beam in Cartesian coordinates.
-
-    Parameters:
-        l (int): Radial mode parameter.
-        p (int): Azimuthal mode parameter.
-        x (float): x-coordinate.
-        y (float): y-coordinate.
-
-    Returns:
-        complex: Value of the Laguerre-Gaussian beam at given coordinates.
-    """
-    # Calculate the squared radial distance
-    rho_squared = x ** 2 + y ** 2
-
-    # Calculate the Laguerre polynomial term
-    laguerre_term = genlaguerre(p, l)(rho_squared)
-
-    # Calculate the angular term
-    angular_term = np.exp(1j * l * np.arctan2(y, x))
-
-    # Normalize the Laguerre-Gaussian beam
-    normalized_beam = laguerre_term * angular_term
-
-    return normalized_beam
 def plot_gaussian_laguerre_cartesian(l, p, X, Y, Z):
 
     plt.contourf(X, Y, Z, cmap='viridis', levels=100)
@@ -67,7 +80,7 @@ def plot_gaussian_laguerre_cartesian(l, p, X, Y, Z):
     plt.ylabel('Y')
     plt.show()
     return None
-def phase_to_superpixel(phase_matrix,pixel_phase, error=10**-2):
+def phase_to_superpixel(phase_matrix,pixel_phase, error=10**-3):
     """
     match the element in phase matrix with elements in the complex plan
     within given error margin.
@@ -121,4 +134,175 @@ def phase_to_superpixel(phase_matrix,pixel_phase, error=10**-2):
             temp_superpixel = np.zeros((4,0))
 
     return two_dimension_superpixel_matrix
-# Example usage:
+
+def phase_to_superpixel(phase_matrix, error=10**-3):
+    superpixel_matrix = []
+    error_map = []
+
+    sum_array, combo = read_data("look_up_table.txt")
+
+    num_row = phase_matrix.shape[0]
+    num_column = phase_matrix.shape[1]
+    sum_array = np.array(sum_array)
+    phase_matrix = np.ravel(phase_matrix)
+    #print(np.min(np.abs(sum_array)))
+    for i in range(len(phase_matrix)):
+        temp = np.abs(sum_array - phase_matrix[i])
+        #print(phase_matrix[i])
+        #print(temp[10:20])
+        #print(sum_array[10:20])
+        min = np.min(temp)
+        min_indices = np.where(temp == min)[0]
+        #print(min)
+        #print(min_indices)
+        superpixel_matrix.append(combo[min_indices[0]])
+        error_map.append(min)
+    #now map the resize the error map with each element represent as a superpixel
+    #meanwhile use the fill the superpixel with masks
+    def create_array_with_indices(indices):
+
+        return indices.reshape(4,4)*255
+
+    temp_superpixel = np.zeros((4, 0))
+    count = 0
+
+    two_dimension_superpixel_matrix = np.zeros((0,num_column*4))
+    for i in range(len(superpixel_matrix)):
+
+        temp_superpixel = np.hstack((temp_superpixel,create_array_with_indices(superpixel_matrix[i])))
+        count+=1
+        if count==num_column:
+            two_dimension_superpixel_matrix = np.vstack((two_dimension_superpixel_matrix, temp_superpixel))
+            count=0
+            temp_superpixel = np.zeros((4,0))
+
+    return two_dimension_superpixel_matrix, np.array(error_map).reshape(num_row,num_column)
+
+
+def hermite_gaussian(x, y, z, w0, k, m, n):
+    """
+    Generate the intensity distribution of a Hermite-Gaussian beam.
+
+    Parameters:
+        x (numpy.ndarray): x-coordinate.
+        y (numpy.ndarray): y-coordinate.
+        z (float): Axial distance.
+        w0 (float): Beam waist.
+        k (float): Wavenumber.
+        m (int): Mode index in x-direction.
+        n (int): Mode index in y-direction.
+
+    Returns:
+        numpy.ndarray: Intensity distribution.
+    """
+    # Calculate beam radius at distance z
+    w_z = w0 * np.sqrt(1 + (z * 2/ (k * w0**2))**2)#double check this
+    R = z*(1+1/(z * 2/ (k * w0**2))**2)
+    # Normalization factor
+    # Hermite polynomials
+    H_m = hermite(m)(np.sqrt(2) * x / w_z)
+    H_n = hermite(n)(np.sqrt(2) * y / w_z)
+    # Gaussian envelope
+    gaussian = np.exp(-(x**2 + y**2) / w_z**2)
+    gaussian_two = np.exp(-1j*k*(x**2+y**2)/(2*R)+1j*k*z-1j*(n+m+1)*np.arctan2(z, k * w0**2 / 2))
+    # Intensity distribution
+    E = H_m * H_n * gaussian * gaussian_two
+
+    return E/np.max(np.abs(E))
+def plot_intensity(x, y, intensity):
+    """
+    Plot the intensity distribution.
+
+    Parameters:
+        x (numpy.ndarray): x-coordinate values.
+        y (numpy.ndarray): y-coordinate values.
+        intensity (numpy.ndarray): Intensity values.
+    """
+    plt.figure(figsize=(8, 6))
+    plt.pcolormesh(x, y, intensity, shading='auto')
+    plt.colorbar(label='Intensity')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Intensity Distribution of Hermite-Gaussian Beam')
+    plt.grid(True)
+    plt.show()
+def laguerre_gaussian(l,p,x, y, z = 1, w_0 = 1, lambda_0 = 1):
+
+    z_0 = np.pi*w_0**2/lambda_0
+    r = (x**2 + y**2)**0.5
+    dis = z/z_0
+    pho = r/w_0
+    R = (1+dis**2)**0.5
+    lagu = genlaguerre(p,abs(l))(2*pho**2/R**2)
+    k = 2*np.pi/lambda_0
+    return ((pho/R)**abs(l)/R * lagu *
+            np.exp(-pho**2/R**2) *
+            np.exp(1j*k*z + 1j*dis*pho**2/(R)**2-1j*(l+2*p+1)*np.arctan(dis)-1j*abs(l)*np.arctan(y/x)))
+def laguerre_gaussian(x, y, z, w0, k, l, p):
+    """
+    Generate the intensity distribution of a Hermite-Gaussian beam.
+
+    Parameters:
+        x (numpy.ndarray): x-coordinate.
+        y (numpy.ndarray): y-coordinate.
+        z (float): Axial distance.
+        w0 (float): Beam waist.
+        k (float): Wavenumber.
+        m (int): Mode index in x-direction.
+        n (int): Mode index in y-direction.
+
+    Returns:
+        numpy.ndarray: Intensity distribution.
+    """
+    # Calculate beam radius at distance z
+    w_z = w0 * np.sqrt(1 + (z * 2/ (k * w0**2))**2)#double check this
+    R = z*(1+1/(z * 2/ (k * w0**2))**2)
+    r = np.sqrt(x**2 +y **2)
+    term_one = w0/w_z*(np.sqrt(2)*r/w_z)**l * np.exp(-r**2/w_z**2)
+    lagu = genlaguerre(p, abs(l))(2 * r ** 2 / w_z ** 2)
+    term_two = np.exp(-1j*k*r**2/(2*R))*np.exp(-1j*l*np.arctan2(y,x))*np.exp(1j*(l+2*p+1)*np.arctan2(z, (k * w0**2)/2))
+    E = term_one*lagu*term_two
+    return E/np.max(np.abs(E))
+def plot_phase_diagram(complex_matrix):
+    phase = np.angle(complex_matrix)
+    plt.imshow(phase, cmap='hsv')
+    plt.colorbar()
+    plt.title('Phase Diagram')
+    plt.show()
+def asymetrical_bessel_beam(n,x,y,c):
+    r = (x**2+y**2)**0.5
+    w = 0.001
+    phi = np.arctan(y/x)
+    part_one = np.exp(-r**2/w**2)
+    alpha = 0.08 *1/(13.68*10**-6)
+    part_two = (alpha*r/(alpha*r+2*c*np.exp(1j*phi)))**(n/2)
+    from scipy.special import jn
+    Jn = jn(n, np.sqrt(alpha*r*(alpha*r+2*c*np.exp(1j*phi))))
+    return np.exp(1j*n*phi) * Jn * part_one * part_two
+def main():
+    from simulation_DMD import plot_pixel
+    Nx = 285
+    Ny = 228
+    X = np.linspace(-0.002, 0.002, num=Nx)
+    Y = np.linspace(-0.002, 0.002, num=Ny)
+    xv, yv = np.meshgrid(X, Y)
+    #matrix = hermite_gaussian(x=xv, y=yv, z=0.5, w0=0.001, k=2*np.pi/(633*10**-9), m=0, n=0)
+    matrix = laguerre_gaussian(x=xv, y=yv, z=0.001, w0=0.001, k=2*np.pi/(633*10**-9), l=1, p=0)
+    #print(np.min(matrix))
+    a,b = phase_to_superpixel(matrix)
+    plot_pixel(a)
+    print(a)
+    plot_phase_diagram(matrix)
+    plot_gaussian_laguerre_cartesian(1,0,X,Y,np.abs(matrix)**2)
+    plot_pixel(b)
+#main()
+def test():
+    from simulation_DMD import plot_pixel
+    a = np.array([[-0.01903+0.0078825j, 0.1j],[0.9j, 0.9j]])
+    a,b = phase_to_superpixel(a)
+    print(a)
+    print(b)
+    plot_pixel(a)
+    plot_pixel(b)
+#test()
+#main()
