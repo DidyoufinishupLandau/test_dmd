@@ -2,12 +2,16 @@ import numpy as np
 from itertools import combinations
 from decimal import Decimal, getcontext
 import matplotlib.pyplot as plt
+import pattern_generator
 from scipy.special import genlaguerre
+
+import generate_pattern
 from simulation_DMD import plot_pixel
 from DMD_driver import DMD_driver
 import time
 from scipy.special import hermite, factorial
-
+from stream_arduino import StreamArduino
+from superpixel_utility import phase_to_superpixel
 
 
 
@@ -15,41 +19,6 @@ y = np.e**(np.arange(0,9,1)*2*np.pi/9*1j)
 y = np.e**(np.arange(0,9,1)*2*np.pi/9*1j)/9
 x = np.e**(np.arange(0,16,1)*2*np.pi/16*1j)/16
 a = np.array([1,2,3])
-def hermite_gaussian(x, y, z, w0, k, m, n):
-    """
-    Generate the intensity distribution of a Hermite-Gaussian beam.
-
-    Parameters:
-        x (numpy.ndarray): x-coordinate.
-        y (numpy.ndarray): y-coordinate.
-        z (float): Axial distance.
-        w0 (float): Beam waist.
-        k (float): Wavenumber.
-        m (int): Mode index in x-direction.
-        n (int): Mode index in y-direction.
-
-    Returns:
-        numpy.ndarray: Intensity distribution.
-    """
-    # Calculate beam radius at distance z
-    x, y = np.meshgrid(x, y)
-    w_z = w0 * np.sqrt(1 + (z * k * w0**2 / 2)**2)
-
-    # Normalization factor
-    C_nm = np.sqrt((2**(-1 - m - n) * factorial(m) * factorial(n)) / (np.pi * factorial(m + n)))
-
-    # Hermite polynomials
-    H_m = hermite(m)(np.sqrt(2) * x / w_z)
-    H_n = hermite(n)(np.sqrt(2) * y / w_z)
-
-    # Gaussian envelope
-    gaussian = np.exp(-(x**2 + y**2) / w_z**2)
-
-    # Intensity distribution
-    intensity = C_nm * H_m * H_n * gaussian
-
-    return np.abs(intensity)**2/np.max(np.abs(intensity))**2, intensity/np.max(np.abs(intensity))
-
 def plot_intensity(x, y, intensity):
     """
     Plot the intensity distribution.
@@ -171,60 +140,6 @@ def plot_gaussian_laguerre_cartesian(l, p):
     plt.ylabel('Y')
     plt.show()
     return normalized_E_field
-def phase_to_superpixel(phase_matrix, error=10**-2):
-    """
-    match the element in phase matrix with elements in the complex plan
-    within given error margin.
-    :param phase_matrix:
-    :param error:
-    :return:
-    """
-    superpixel_matrix = []
-    error_map = []
-    error_scale = np.linspace(error, 1,100)
-    sum_array, combo = get_combination_sums_and_indices(x)
-    sum_array, combo = remove_complex_duplicates(sum_array, combo)
-    num_row = phase_matrix.shape[0]
-    num_column = phase_matrix.shape[1]
-    sum_array = np.array(sum_array)
-    phase_matrix = np.ravel(phase_matrix)
-    for i in range(len(phase_matrix)):
-        temp = abs(sum_array - phase_matrix[i])
-        min = np.min(temp)
-        min_indices = np.where(temp == min)[0]
-        if min < error:
-            superpixel_matrix.append(combo[min_indices[0]])
-            error_map.append(error)
-        else:
-            for i in range(len(error_scale)):
-                if min < error_scale[i]:
-                    superpixel_matrix.append(combo[min_indices[0]])
-                    error_map.append(error)
-                    break
-    #now map the resize the error map with each element represent as a superpixel
-    #meanwhile use the fill the superpixel with masks
-    def create_array_with_indices(indices, shape=(4,4)):
-        array = np.zeros(shape, dtype=int)
-        for index in indices:
-            row = int(np.floor(index/shape[0]))
-            column = np.mod(index,shape[1])
-            array[row][column] = 255
-        return array
-
-    temp_superpixel = np.zeros((4, 0))
-    count = 0
-
-    two_dimension_superpixel_matrix = np.zeros((0,num_column*4))
-    for i in range(len(superpixel_matrix)):
-
-        temp_superpixel = np.hstack((temp_superpixel,create_array_with_indices(superpixel_matrix[i])))
-        count+=1
-        if count==num_column:
-            two_dimension_superpixel_matrix = np.vstack((two_dimension_superpixel_matrix, temp_superpixel))
-            count=0
-            temp_superpixel = np.zeros((4,0))
-
-    return two_dimension_superpixel_matrix
 
 def alignment_process():
     dmd_pattern_one = alignment_pattern_horizontal()
@@ -255,64 +170,59 @@ def alignment_process():
     # Stop the sequence
     time.sleep(500)
     dmd.stop_projecting()
+
 def target_field():
-    sum_array, combo = get_combination_sums_and_indices(x)
-    sum_array, combo = remove_complex_duplicates(sum_array, combo)
-    normalized_E_field = plot_gaussian_laguerre_cartesian(0, 2)
+    #SA = StreamArduino()
     # normalized_E_field = plane_wave()
-    target_matrix = phase_to_superpixel(normalized_E_field)
-    dmd_pattern = target_matrix[:, :, np.newaxis].astype(np.uint8)
-    print(dmd_pattern)
+    dmd_pattern = generate_pattern.SuperpixelPattern().LG_mode(1,0)
+    plot_pixel(dmd_pattern)
+    dmd_pattern = dmd_pattern[:, :, np.newaxis].astype(np.uint8)
     dmd = DMD_driver()
     # Create a default project
     dmd.create_project(project_name='test_project')
     dmd.create_main_sequence(seq_rep_count=1)
     # Image
-    reference_pattern = np.ones((228, 285))
-    reference_pattern = phase_to_superpixel(reference_pattern)[:, :, np.newaxis].astype(np.uint8)
-    plot_pixel(reference_pattern)
     count = 0
-    for i in range(0, 500):
+    for i in range(0, 200):
         count += 1
         dmd.add_sequence_item(image=dmd_pattern, seq_id=1, frame_time=3000)
-        dmd.add_sequence_item(image=reference_pattern, seq_id=1, frame_time=3000)
     # Create the main sequence
     print("start projecting")
     dmd.my_trigger()
     dmd.start_projecting()
+    time.sleep(5000)
+    #SA.print_data()
     # Stop the sequence
-    time.sleep(500)
     dmd.stop_projecting()
 
 def project_gaussian_hermite_beam():
-    w0 = 1.0  # Beam waist
-    k = 2 * np.pi / 0.5  # Wavenumber
+    from superpixel_utility import hermite_gaussian, plot_gaussian_laguerre_cartesian, plot_phase_diagram
+    Nx = 285
+    Ny = 228
+    X = np.linspace(-0.002, 0.002, num=Nx)
+    Y = np.linspace(-0.002, 0.002, num=Ny)
+    xv, yv = np.meshgrid(X, Y)
     gh_target_matrix_list = []
-    for i in range(2):
-        for j in range(2):
-            m = i  # Mode index in x-direction
-            n = j  # Mode index in y-direction
-            # Calculate intensity distribution
-            gaussian_hermite, gaussian_hermite_phase = hermite_gaussian(np.linspace(-5, 5, 285),
-                                                                        np.linspace(-5, 5, 228),
-                                                                        0, w0, k, m, n)
-            gh_target_matrix = phase_to_superpixel(gaussian_hermite_phase)
-            gh_target_matrix_list.append(gh_target_matrix[:, :, np.newaxis].astype(np.uint8))
+    gaussian_hermite_phase = hermite_gaussian(x=xv, y=yv, z=1, w0=0.001, k=2*np.pi/(633*10**-9), m=0, n=0)
+    plot_gaussian_laguerre_cartesian(1,0,X,Y, np.abs(gaussian_hermite_phase))
+    gh_target_matrix = phase_to_superpixel(gaussian_hermite_phase)
+    plot_pixel(gh_target_matrix[0])
+    plot_phase_diagram(gaussian_hermite_phase)
+    plot_pixel(gh_target_matrix[1])
+    a = gh_target_matrix[0][:, :, np.newaxis].astype(np.uint8)
+    gh_target_matrix_list.append(a)
 
     # Plot intensity distribution
-    plot_intensity(np.linspace(-5, 5, 285), np.linspace(-5, 5, 228), gaussian_hermite)
-    plot_pixel(gh_target_matrix)
-
     dmd = DMD_driver()
     # Create a default project
     dmd.create_project(project_name='test_project')
     dmd.create_main_sequence(seq_rep_count=1)
     # Image
     reference_pattern = np.ones((228, 285))
-    reference_pattern = phase_to_superpixel(reference_pattern)[:, :, np.newaxis].astype(np.uint8)
+    reference_pattern = phase_to_superpixel(reference_pattern)[0][:, :, np.newaxis].astype(np.uint8)
     plot_pixel(reference_pattern)
     count = 0
-    for i in range(0, 50):
+    for i in range(0, 500):
         count += 1
         for j in range(len(gh_target_matrix_list)):
             dmd.add_sequence_item(image=gh_target_matrix_list[j], seq_id=1, frame_time=3000)
@@ -322,8 +232,28 @@ def project_gaussian_hermite_beam():
     dmd.my_trigger()
     dmd.start_projecting()
     # Stop the sequence
-    time.sleep(500)
+    time.sleep(5000)
+    dmd.stop_projecting()
+def scanning_pixel():
+    SA = StreamArduino()
+    dmd = DMD_driver()
+    # Create a default project
+    dmd.create_project(project_name='test_project')
+    dmd.create_main_sequence(seq_rep_count=1)
+    # Image
+    SP = generate_pattern.SuperpixelPattern()
+    for i in range(228):
+        dmd.add_sequence_item(image=SP.plane_wave_scanning((0,i)), seq_id=1, frame_time=3000)
+        dmd.add_sequence_item(image=np.ones((912,1144))[:, :, np.newaxis].astype(np.uint8), seq_id=1, frame_time=3000)
+    # Create the main sequence
+    print("start projecting")
+    dmd.my_trigger()
+    dmd.start_projecting()
+    SA.print_data()
+    # Stop the sequence
+    time.sleep(5000)
     dmd.stop_projecting()
 #alignment_process()
-#target_field()
-project_gaussian_hermite_beam()
+target_field()
+#project_gaussian_hermite_beam()
+#scanning_pixel()
